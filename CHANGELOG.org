@@ -1,5 +1,8 @@
 #+title: Changelog
 
+* <2026-03-24 Mon>
+- Feature: ~org-milestone-table-empty~ now includes a Status column in the template.
+
 * <2025-03-23 Sun>
 - Feature: ~C-c C-c~ in a milestone table now runs add-missing-IDs, update-dates, and sort-by-date in sequence.
 - Implemented via ~gh/org-milestone-table-dwim~ and ~org-ctrl-c-ctrl-c-hook~.

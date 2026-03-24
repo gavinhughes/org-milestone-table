@@ -302,7 +302,7 @@ Point is placed at the beginning of the table."
     (org-milestone-table-empty)
     (goto-char (point-min))
     (let ((content (buffer-string)))
-      (should (string-match-p "| ID | Pred | Date | Milestone |" content))
+      (should (string-match-p "| ID | Pred | Date | Status | Milestone |" content))
       (should (string-match-p "|----" content)))))
 
 (provide 'org-milestone-table-test)

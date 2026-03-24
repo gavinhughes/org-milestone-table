@@ -59,9 +59,9 @@
 (defun org-milestone-table-empty ()
   "Insert an empty milestone table at point."
   (interactive)
-  (insert "| ID | Pred | Date | Milestone |
-|----+------+------+-----------|
-|    |      |      |           |
+  (insert "| ID | Pred | Date | Status | Milestone |
+|----+------+------+--------+-----------|
+|    |      |      |        |           |
 ")
   (forward-line -1)
   (org-table-goto-column 1)

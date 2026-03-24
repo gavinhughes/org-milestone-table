@@ -33,9 +33,9 @@ Clone this repository and add it to your =load-path=:
 =M-x org-milestone-table-empty=
 
 #+begin_example
-| ID | Pred | Date | Milestone |
-|----+------+------+-----------|
-|    |      |      |           |
+| ID | Pred | Date | Status | Milestone |
+|----+------+------+--------+-----------|
+|    |      |      |        |           |
 #+end_example
 
 ** Fill in your milestones
