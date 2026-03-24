@@ -260,8 +260,8 @@ Point is placed at the beginning of the table."
     (org-milestone-table-add-missing-ids)
     (goto-char (point-min))
     (let ((content (buffer-string)))
-      (should (string-match-p "| 2 " content))
-      (should (string-match-p "| 3 " content)))))
+      (should (string-match-p "|\\s-+2\\s-+|" content))
+      (should (string-match-p "|\\s-+3\\s-+|" content)))))
 
 ;;; --- org-milestone-table-sort-by-date ---
 
