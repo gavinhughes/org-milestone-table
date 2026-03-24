@@ -194,13 +194,14 @@ Point is placed at the beginning of the table."
 (ert-deftest omt-test-resolve-cycle-detection ()
   "Cycle in predecessors produces an error."
   (let ((tbl (make-hash-table :test 'equal))
-        (errors nil)
         (r1 (list :id "1" :pred "2+0d" :date nil))
         (r2 (list :id "2" :pred "1+0d" :date nil)))
     (puthash "1" r1 tbl)
     (puthash "2" r2 tbl)
-    (omt--resolve r1 tbl 'errors nil)
-    (should (not (null errors)))))
+    (defvar omt--test-errors nil)
+    (setq omt--test-errors nil)
+    (omt--resolve r1 tbl 'omt--test-errors nil)
+    (should (not (null omt--test-errors)))))
 
 (ert-deftest omt-test-resolve-max-of-multiple-preds ()
   "Multiple predecessors: result is the max (latest) date."
