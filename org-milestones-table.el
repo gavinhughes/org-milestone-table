@@ -1,3 +1,61 @@
+;;; org-milestone-table.el --- Milestone timeline tables for Org mode -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2024-2026 Free Software Foundation, Inc.
+
+;; Author: Your Name <you@example.com>
+;; Maintainer: Your Name <you@example.com>
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "28.1") (org "9.5"))
+;; Homepage: https://github.com/yourusername/org-milestone-table
+;; Keywords: outlines, calendar, convenience
+
+;; This file is not part of GNU Emacs.
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; org-milestone-table provides commands for managing milestone timeline
+;; tables inside Org mode buffers.  Define milestones with IDs, predecessor
+;; relationships and date offsets, then compute dates automatically.
+;;
+;; Usage:
+;;   M-x org-milestone-table-empty       Insert a blank milestone table
+;;   M-x org-milestone-table-update-timeline  Compute dates from predecessors
+;;   M-x org-milestone-table-add-missing-ids  Auto-number rows without IDs
+;;   M-x org-milestone-table-sort-by-date     Sort rows by computed date
+;;
+;; Predecessor syntax:
+;;   3+10d   means: 10 days after milestone 3
+;;   3-2w    means: 2 weeks before milestone 3
+;;   3+1m    means: 1 month after milestone 3
+;;   5       means: same date as milestone 5 (shorthand for 5+0d)
+;;   1+5d,2+3d  means: the later of (1+5d, 2+3d)
+
+;;; Code:
+
+(require 'org)
+(require 'org-table)
+(require 'calendar)
+(require 'cl-lib)
+
+(defgroup org-milestone-table nil
+  "Milestone timeline tables for Org mode."
+  :group 'org
+  :prefix "org-milestone-table-"
+  :link '(url-link "https://github.com/yourusername/org-milestone-table"))
+
 (defun org-milestone-table-empty ()
   "Insert an empty milestone table at point."
   (interactive)
@@ -9,10 +67,7 @@
   (org-table-goto-column 1)
   (when (bound-and-true-p evil-mode)
     (evil-insert-state)))
-#+end_src
 
-
-#+begin_src elisp
 (defun omt--parse-pred-list (pred)
   "Split PRED on commas, trim each element, return list of strings."
   (mapcar #'string-trim (split-string pred "," t "[ \t]+")))
@@ -359,4 +414,7 @@ Rows without a date are sorted to the end."
         (insert (cdr rl) "\n"))
       (goto-char (org-table-begin))
       (org-table-align)
-      (message "Sorted %d row(s) by date." (length row-lines)))))
+      (message "Sorted %d row(s) by date." (length row-lines))))        (message "Sorted %d row(s) by date." (length row-lines)))))
+
+      (message "Sorted %d row(s) by date." (length row-lines))))(provide 'org-milestone-table)
+      (message "Sorted %d row(s) by date." (length row-lines))));;; org-milestone-table.el ends here

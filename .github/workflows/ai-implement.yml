@@ -1,0 +1,61 @@
+name: AI Implement Issue
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  implement:
+    if: github.event.label.name == 'ai-implement'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: "29.4"
+
+      - name: Install aider
+        run: pip install aider-chat
+
+      - name: Create branch
+        run: |
+          BRANCH="ai/issue-${{ github.event.issue.number }}"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Run aider
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          aider \
+            --yes-always \
+            --no-auto-commits \
+            --message "Implement GitHub issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}
+
+          ${{ github.event.issue.body }}"
+
+      - name: Commit and push
+        run: |
+          git add -A
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "feat: implement #${{ github.event.issue.number }} - ${{ github.event.issue.title }}"
+          git push origin "$BRANCH"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --title "feat: implement #${{ github.event.issue.number }} - ${{ github.event.issue.title }}" \
+            --body "Closes #${{ github.event.issue.number }}
+
+          Automated implementation by aider." \
+            --base main \
+            --head "$BRANCH"

@@ -1,1 +1,7 @@
 .aider*
+!.aider.conf.yml
+*.elc
+*-autoloads.el
+*-pkg.el
+/.cask/
+/dist/

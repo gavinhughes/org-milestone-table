@@ -2,3 +2,7 @@
 
 * Feature: Year unit (=y=) support in Pred offsets
 * Feature: Export timeline to simple Gantt-style ASCII chart
+* Feature: Highlight critical path in timeline
+* Feature: Interactive milestone insertion with completion
+* Feature: Integration with Org agenda views
+* Feature: Support for business-day offsets (skip weekends)

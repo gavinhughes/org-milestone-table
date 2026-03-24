@@ -1,0 +1,114 @@
+#+title: org-milestone-table
+#+author: Your Name
+
+[[https://github.com/yourusername/org-milestone-table/actions][file:https://github.com/yourusername/org-milestone-table/actions/workflows/ci.yml/badge.svg]]
+
+Milestone timeline tables for [[https://orgmode.org][Org mode]].
+
+Define milestones with IDs and predecessor relationships, then compute dates
+automatically.  Think of it as a tiny, in-buffer project scheduler.
+
+* Installation
+
+** MELPA (once accepted)
+
+#+begin_src elisp
+(use-package org-milestone-table
+  :ensure t)
+#+end_src
+
+** Manual
+
+Clone this repository and add it to your =load-path=:
+
+#+begin_src elisp
+(add-to-list 'load-path "/path/to/org-milestone-table")
+(require 'org-milestone-table)
+#+end_src
+
+* Usage
+
+** Insert an empty table
+
+=M-x org-milestone-table-empty=
+
+#+begin_example
+| ID | Pred | Date | Milestone |
+|----+------+------+-----------|
+|    |      |      |           |
+#+end_example
+
+** Fill in your milestones
+
+#+begin_example
+| ID | Pred  | Date       | Milestone        |
+|----+-------+------------+------------------|
+| 1  |       | 2025-01-01 | Project start    |
+| 2  | 1+14d |            | Design complete  |
+| 3  | 2+7d  |            | Prototype ready  |
+| 4  | 3+30d |            | Testing complete |
+| 5  | 4+5d  |            | Launch           |
+#+end_example
+
+** Compute dates
+
+=M-x org-milestone-table-update-timeline=
+
+All rows with predecessor references will have their Date column filled in
+automatically.
+
+** Auto-number rows
+
+=M-x org-milestone-table-add-missing-ids=
+
+Rows without an ID get sequential numbers starting after the highest existing ID.
+
+** Sort by date
+
+=M-x org-milestone-table-sort-by-date=
+
+Reorders data rows by date ascending.  Rows without dates sort to the end.
+
+* Predecessor Syntax
+
+Predecessors are specified in the =Pred= column:
+
+| Syntax    | Meaning                              |
+|-----------+--------------------------------------|
+| =3+10d=  | 10 days after milestone 3            |
+| =3-2w=   | 2 weeks before milestone 3           |
+| =3+1m=   | 1 month after milestone 3            |
+| =5=      | Same date as milestone 5 (= =5+0d=) |
+| =1+5d,2= | Later of: 5 days after 1, date of 2 |
+
+Supported units:
+- =d= — days
+- =w= — weeks (7 days)
+- =m= — months (calendar months, day clamped to month length)
+
+Multiple predecessors are separated by commas.  The *latest* (maximum) date
+wins.
+
+* Suggested Keybindings
+
+#+begin_src elisp
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "C-c m u") #'org-milestone-table-update-timeline)
+  (define-key org-mode-map (kbd "C-c m i") #'org-milestone-table-add-missing-ids)
+  (define-key org-mode-map (kbd "C-c m s") #'org-milestone-table-sort-by-date)
+  (define-key org-mode-map (kbd "C-c m e") #'org-milestone-table-empty))
+#+end_src
+
+* Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Run =make test= and =make byte-compile= before submitting
+4. Open a pull request
+
+Issues labeled =ai-implement= will be automatically picked up by the CI
+workflow for AI-assisted implementation.
+
+* License
+
+GPL-3.0-or-later.  See [[file:LICENSE][LICENSE]].
