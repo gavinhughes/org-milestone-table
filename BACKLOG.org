@@ -1,0 +1,4 @@
+#+title: Backlog
+
+* Feature: Year unit (=y=) support in Pred offsets
+* Feature: Export timeline to simple Gantt-style ASCII chart

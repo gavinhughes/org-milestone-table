@@ -1,0 +1,20 @@
+#+title: Example Table
+
+| ID |   Pred |       Date | Status | Milestone                                      | Notes          |
+|----+--------+------------+--------+------------------------------------------------+----------------|
+|  8 |        | 2025-01-10 |        | Start: Site survey and geotechnical assessment |                |
+|  7 |      8 | 2025-01-10 |        | Land ownership verification                    |                |
+|  6 |   8+2m | 2025-03-10 |        | Environmental impact screening complete        | Critical path? |
+|  4 |  8,6,7 | 2025-03-10 |        | Permit A: Start application prep               |                |
+|  3 |   4+1d | 2025-03-11 |        | Permit A: Submit application                   |                |
+| 10 |   3+1d | 2025-03-12 |        | Permit A: Receive proof of payment             |                |
+|  1 |  10+1d | 2025-03-13 |        | Authority B: Send request letter               |                |
+| 16 | 12-45d | 2025-03-13 |        | Permit C: Start prerequisites and prep         |                |
+| 19 |     16 | 2025-03-13 |        | Utility connection clearance                   |                |
+| 18 |     16 | 2025-03-13 |        | Heritage non-objection certificate             |                |
+| 17 |     16 | 2025-03-13 |        | Neighbourhood council endorsement              |                |
+| 11 |  1+45d | 2025-04-27 |        | Authority B: Approval issued                   |                |
+| 12 |     11 | 2025-04-27 |        | Permit C: Submit application                   |                |
+| 13 |  12+1m | 2025-05-27 |        | Permit C: Issued                               |                |
+| 14 |        | 2025-07-01 |        | Contractor selection and award                 |                |
+| 15 |  13,14 | 2025-07-01 |        | Commence construction                          |                |

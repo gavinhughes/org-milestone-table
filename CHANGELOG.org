@@ -1,0 +1,24 @@
+#+title: Changelog
+
+* <2025-03-23 Sun>
+- Feature: ~C-c C-c~ in a milestone table now runs add-missing-IDs, update-dates, and sort-by-date in sequence.
+- Implemented via ~gh/org-milestone-table-dwim~ and ~org-ctrl-c-ctrl-c-hook~.
+- Bugfix: wrap ~omt--resolve~ body in ~cl-block~ so ~cl-return-from~ works for cycle detection.
+- Column label now accepts "Pred" or "Predecessors" (case-insensitive).
+- New command: ~org-milestone-table-add-missing-ids~ — finds max existing numeric ID, assigns incrementing IDs to rows that lack one.
+- New command: ~org-milestone-table-sort-by-date~ — sorts data rows by Date ascending; rows without dates go to the end.
+
+* <2025-03-15 Sat>
+- Initial version.
+- Dynamic column detection: parses header row to find =ID=, =Pred=, =Date= by name (case-insensitive).
+- No hardcoded heading: uses ~(org-table-begin)~ --- cursor just needs to be inside any table.
+- Dynamic column regex: builds cell-replacement regex from ~col-date~ rather than hardcoding column position.
+- Month unit (=m=) support in Pred (e.g. =6+1m=) with proper calendar arithmetic.
+- Table realignment after updates via ~(org-table-align)~.
+- Only =ID=, =Pred=, =Date= columns are required; other columns are ignored and preserved.
+- Bare number in Pred (e.g. =6=) is now treated as =6+0d= --- copies the referenced row's date.
+- Pred referencing an unknown ID now produces an explicit error: ="Pred references unknown ID 'N'"=.
+- Switch date format from =M /DD= to ISO 8601 =YYYY-MM-DD=.
+- ~parse-date~ now matches =YYYY-MM-DD= pattern and extracts year from the string.
+- ~format-date~ now emits zero-padded =YYYY-MM-DD=.
+- Removed hardcoded year assumption (previously defaulted to 2025).
