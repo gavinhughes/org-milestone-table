@@ -1,6 +1,5 @@
 #+title: Backlog
 
-* Feature: Add status column to new table command
 * Feature: Year unit (=y=) support in Pred offsets
 * Feature: Export timeline to simple Gantt-style ASCII chart
 * Feature: Highlight critical path in timeline
