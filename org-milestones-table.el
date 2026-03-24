@@ -414,7 +414,7 @@ Rows without a date are sorted to the end."
         (insert (cdr rl) "\n"))
       (goto-char (org-table-begin))
       (org-table-align)
-      (message "Sorted %d row(s) by date." (length row-lines))))        (message "Sorted %d row(s) by date." (length row-lines)))))
+      (message "Sorted %d row(s) by date." (length row-lines)))))
 
-      (message "Sorted %d row(s) by date." (length row-lines))))(provide 'org-milestone-table)
-      (message "Sorted %d row(s) by date." (length row-lines))));;; org-milestone-table.el ends here
+(provide 'org-milestone-table)
+;;; org-milestone-table.el ends here
