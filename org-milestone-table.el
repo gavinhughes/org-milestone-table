@@ -2,11 +2,10 @@
 
 ;; Copyright (C) 2024-2026 Free Software Foundation, Inc.
 
-;; Author: Your Name <you@example.com>
-;; Maintainer: Your Name <you@example.com>
+;; Author: Gavin Hughes
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "28.1") (org "9.5"))
-;; Homepage: https://github.com/yourusername/org-milestone-table
+;; Homepage: https://github.com/gavinhughes/org-milestone-table
 ;; Keywords: outlines, calendar, convenience
 
 ;; This file is not part of GNU Emacs.
