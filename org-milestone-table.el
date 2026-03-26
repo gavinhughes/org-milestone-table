@@ -30,7 +30,7 @@
 ;; relationships and date offsets, then compute dates automatically.
 ;;
 ;; Usage:
-;;   M-x org-milestone-table-empty       Insert a blank milestone table
+;;   M-x org-milestone-table-new       Insert a blank milestone table
 ;;   M-x org-milestone-table-update-timeline  Compute dates from predecessors
 ;;   M-x org-milestone-table-add-missing-ids  Auto-number rows without IDs
 ;;   M-x org-milestone-table-sort-by-date     Sort rows by computed date
@@ -55,7 +55,7 @@
   :prefix "org-milestone-table-"
   :link '(url-link "https://github.com/yourusername/org-milestone-table"))
 
-(defun org-milestone-table-empty ()
+(defun org-milestone-table-new ()
   "Insert an empty milestone table at point."
   (interactive)
   (insert "| ID | Pred | Date | Status | Milestone |
