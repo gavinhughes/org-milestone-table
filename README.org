@@ -30,7 +30,7 @@ Clone this repository and add it to your =load-path=:
 
 ** Insert an empty table
 
-=M-x org-milestone-table-empty=
+=M-x org-milestone-table-new=
 
 #+begin_example
 | ID | Pred | Date | Status | Milestone |
@@ -96,7 +96,7 @@ wins.
   (define-key org-mode-map (kbd "C-c m u") #'org-milestone-table-update-timeline)
   (define-key org-mode-map (kbd "C-c m i") #'org-milestone-table-add-missing-ids)
   (define-key org-mode-map (kbd "C-c m s") #'org-milestone-table-sort-by-date)
-  (define-key org-mode-map (kbd "C-c m e") #'org-milestone-table-empty))
+  (define-key org-mode-map (kbd "C-c m n") #'org-milestone-table-new))
 #+end_src
 
 * Contributing

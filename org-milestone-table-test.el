@@ -293,13 +293,13 @@ Point is placed at the beginning of the table."
       (should (< (string-match "Has date" content)
                  (string-match "No date" content))))))
 
-;;; --- org-milestone-table-empty ---
+;;; --- org-milestone-table-new ---
 
-(ert-deftest omt-test-empty-table-insertion ()
-  "Inserting an empty table produces correct structure."
+(ert-deftest omt-test-new-table-insertion ()
+  "Inserting an new table produces correct structure."
   (with-temp-buffer
     (org-mode)
-    (org-milestone-table-empty)
+    (org-milestone-table-new)
     (goto-char (point-min))
     (let ((content (buffer-string)))
       (should (string-match-p "| ID | Pred | Date | Status | Milestone |" content))
