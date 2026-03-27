@@ -1,5 +1,8 @@
 #+title: Changelog
 
+* <2026-03-26 Mon>
+- Chore: Rename ~org-milestone-table-empty~ to ~org-milestone-table-new~.
+
 * <2026-03-24 Mon>
 - Feature: ~org-milestone-table-empty~ now includes a Status column in the template.
 
