@@ -49,12 +49,15 @@
 (require 'calendar)
 (require 'cl-lib)
 
+(declare-function evil-insert-state "evil-states" ())
+
 (defgroup org-milestone-table nil
   "Milestone timeline tables for Org mode."
   :group 'org
   :prefix "org-milestone-table-"
-  :link '(url-link "https://github.com/yourusername/org-milestone-table"))
+  :link '(url-link "https://github.com/gavinhughes/org-milestone-table"))
 
+;;;###autoload
 (defun org-milestone-table-new ()
   "Insert an empty milestone table at point."
   (interactive)
@@ -206,6 +209,7 @@ VISITED is list of IDs seen so far for cycle detection."
                 nil
               (apply #'max dates)))))))))
 
+;;;###autoload
 (defun org-milestone-table-update-timeline ()
   "Update dates in org milestone table at point."
   (interactive)
@@ -293,6 +297,7 @@ VISITED is list of IDs seen so far for cycle detection."
           (org-table-align)
           (message "Updated %d date(s)." (length updates)))))))
 
+;;;###autoload
 (defun org-milestone-table-add-missing-ids ()
   "Add sequential IDs to rows in the milestone table that lack one.
 Finds the maximum existing numeric ID and assigns incrementing IDs
@@ -369,6 +374,7 @@ starting from max+1."
         (org-table-align)
         (message "Added %d ID(s), starting from %d." count (1+ max-id))))))
 
+;;;###autoload
 (defun org-milestone-table-sort-by-date ()
   "Sort data rows of the milestone table at point by the Date column.
 Rows without a date are sorted to the end."
