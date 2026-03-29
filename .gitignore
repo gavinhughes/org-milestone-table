@@ -1,5 +1,6 @@
 .aider*
 !.aider.conf.yml
+DEVNOTES.org
 *.elc
 *-autoloads.el
 *-pkg.el
