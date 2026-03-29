@@ -8,7 +8,7 @@
 
 * <2025-03-23 Sun>
 - Feature: ~C-c C-c~ in a milestone table now runs add-missing-IDs, update-dates, and sort-by-date in sequence.
-- Implemented via ~gh/org-milestone-table-dwim~ and ~org-ctrl-c-ctrl-c-hook~.
+- Implemented via ~org-milestone-table-dwim~ on ~org-ctrl-c-ctrl-c-hook~.
 - Bugfix: wrap ~omt--resolve~ body in ~cl-block~ so ~cl-return-from~ works for cycle detection.
 - Column label now accepts "Pred" or "Predecessors" (case-insensitive).
 - New command: ~org-milestone-table-add-missing-ids~ — finds max existing numeric ID, assigns incrementing IDs to rows that lack one.
