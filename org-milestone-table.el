@@ -428,5 +428,26 @@ Rows without a date are sorted to the end."
       (org-table-align)
       (message "Sorted %d row(s) by date." (length row-lines)))))
 
+(defun org-milestone-table-dwim ()
+  "If point is in a milestone table, update it and return t.
+Runs `org-milestone-table-add-missing-ids',
+`org-milestone-table-update-timeline', and
+`org-milestone-table-sort-by-date' in sequence.
+Intended for use on `org-ctrl-c-ctrl-c-hook'."
+  (when (and (org-at-table-p)
+             (save-excursion
+               (goto-char (org-table-begin))
+               (condition-case nil
+                   (progn (omt--parse-header) t)
+                 (user-error nil))))
+    (org-milestone-table-add-missing-ids)
+    (org-milestone-table-update-timeline)
+    (org-milestone-table-sort-by-date)
+    t))
+
+;;;###autoload
+(with-eval-after-load 'org
+  (add-hook 'org-ctrl-c-ctrl-c-hook #'org-milestone-table-dwim))
+
 (provide 'org-milestone-table)
 ;;; org-milestone-table.el ends here
