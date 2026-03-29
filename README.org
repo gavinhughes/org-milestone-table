@@ -1,7 +1,7 @@
 #+title: org-milestone-table
-#+author: Your Name
+#+author: Gavin Hughes
 
-[[https://github.com/yourusername/org-milestone-table/actions][file:https://github.com/yourusername/org-milestone-table/actions/workflows/ci.yml/badge.svg]]
+[[https://github.com/gavinhughes/org-milestone-table/actions][file:https://github.com/gavinhughes/org-milestone-table/actions/workflows/ci.yml/badge.svg]]
 
 Milestone timeline tables for [[https://orgmode.org][Org mode]].
 
