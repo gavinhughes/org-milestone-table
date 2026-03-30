@@ -59,6 +59,15 @@ The file header in `org-milestone-table.el` must include:
 - `;;; Code:` section before any code
 - `(provide 'org-milestone-table)` and `;;; filename ends here` at the end
 
+## Developer environment
+
+The author uses Doom Emacs. When suggesting Emacs configuration snippets,
+use Doom conventions:
+- `package!` in `~/.doom.d/packages.el` for package declarations
+- `use-package!` in `~/.doom.d/config.el` for configuration
+- `doom sync` to apply package changes (not `package-install` or similar)
+- Do not suggest manual `load-path` manipulation — Doom manages this
+
 ## Org file formatting
 
 When writing or editing .org files in this project, avoid using all caps for
@@ -69,6 +78,3 @@ headings and emphasis.
 GitHub Actions runs `make byte-compile` and `make test` against Emacs
 28.2, 29.4, and 30.1 on every push to master and every PR.
 
-## Known issues to fix
-
-(None currently tracked.)
