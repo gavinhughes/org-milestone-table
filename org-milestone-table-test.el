@@ -305,6 +305,16 @@ Point is placed at the beginning of the table."
       (should (string-match-p "| ID | Pred | Date | Status | Milestone |" content))
       (should (string-match-p "|----" content)))))
 
+(ert-deftest omt-test-update-duplicate-id-error ()
+  "Duplicate IDs surface in *Milestone Table Errors* buffer."
+  (omt-test-with-table
+      "| ID | Pred | Date       |\n|----+------+------------|\n|  1 |      | 2025-01-01 |\n|  1 |      | 2025-02-01 |\n"
+    (org-milestone-table-update-timeline)
+    (let ((buf (get-buffer "*Milestone Table Errors*")))
+      (should buf)
+      (with-current-buffer buf
+        (should (string-match-p "Duplicate ID: 1" (buffer-string)))))))
+
 (ert-deftest omt-test-update-errors-shown-in-buffer ()
   "Validation errors appear in *Milestone Table Errors* buffer."
   (omt-test-with-table
