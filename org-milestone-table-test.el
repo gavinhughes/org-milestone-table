@@ -305,5 +305,15 @@ Point is placed at the beginning of the table."
       (should (string-match-p "| ID | Pred | Date | Status | Milestone |" content))
       (should (string-match-p "|----" content)))))
 
+(ert-deftest omt-test-update-errors-shown-in-buffer ()
+  "Validation errors appear in *Milestone Table Errors* buffer."
+  (omt-test-with-table
+      "| ID | Pred  | Date       |\n|----+-------+------------|\n|  1 |       | 2025-01-01 |\n|  2 | 99+1d |            |\n"
+    (org-milestone-table-update-timeline)
+    (let ((buf (get-buffer "*Milestone Table Errors*")))
+      (should buf)
+      (with-current-buffer buf
+        (should (string-match-p "Unknown ID" (buffer-string)))))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here

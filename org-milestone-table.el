@@ -51,6 +51,10 @@
 
 (declare-function evil-insert-state "evil-states" ())
 
+(defvar omt--errors nil
+  "Temporary error accumulator for `omt--resolve'.
+Declared as a special variable so dynamic binding works with `symbol-value'.")
+
 (defgroup org-milestone-table nil
   "Milestone timeline tables for Org mode."
   :group 'org
@@ -209,6 +213,22 @@ VISITED is list of IDs seen so far for cycle detection."
                 nil
               (apply #'max dates)))))))))
 
+(defun omt--display-errors (errors)
+  "Display ERRORS in a dedicated read-only buffer and pop it up."
+  (let ((buf (get-buffer-create "*Milestone Table Errors*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "%d error(s) in milestone table:\n\n"
+                        (length errors)))
+        (dolist (e errors)
+          (insert (format "  \u2022 %s\n" e))))
+      (special-mode)
+      (goto-char (point-min)))
+    (display-buffer buf
+                   '((display-buffer-at-bottom)
+                     (window-height . 0.25)))))
+
 ;;;###autoload
 (defun org-milestone-table-update-timeline ()
   "Update dates in org milestone table at point."
@@ -224,8 +244,8 @@ VISITED is list of IDs seen so far for cycle detection."
            (col-date (car (cdr (cdr (cdr hdr)))))
            (rows nil)
            (id-to-row (make-hash-table :test 'equal))
-           (errors nil)
-           (errs-sym 'errors))
+           (omt--errors nil)
+           (errs-sym 'omt--errors))
       ;; Skip header and hlines
       (forward-line 1)
       (while (and (looking-at "^[ \t]*|")
@@ -260,11 +280,10 @@ VISITED is list of IDs seen so far for cycle detection."
                             (omt--format-date
                              (calendar-gregorian-from-absolute a)))
                       updates)))))
-        (if errors
+        (if omt--errors
             (progn
-              (setq errors (delete-dups (nreverse errors)))
-              (message "Errors:\n%s"
-                       (mapconcat #'identity errors "\n")))
+              (setq omt--errors (delete-dups (nreverse omt--errors)))
+              (omt--display-errors omt--errors))
           ;; Apply in reverse buffer order
           (setq updates (sort updates (lambda (a b) (> (car a) (car b)))))
           (let ((col-re
