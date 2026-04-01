@@ -267,7 +267,10 @@ VISITED is list of IDs seen so far for cycle detection."
                             :date (unless (string-empty-p dts) dts))))
               (push r rows)
               (when (plist-get r :id)
-                (puthash (plist-get r :id) r id-to-row)))))
+                (if (gethash (plist-get r :id) id-to-row)
+                    (push (format "Duplicate ID: %s" (plist-get r :id))
+                          (symbol-value errs-sym))
+                  (puthash (plist-get r :id) r id-to-row))))))
         (forward-line 1))
       (setq rows (nreverse rows))
       ;; Resolve and collect updates

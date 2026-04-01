@@ -1,5 +1,7 @@
 #+title: Backlog
 
+* Chore: Rename ~org-milestone-table-empty~ to ~org-milestone-table-new~
+
 * Feature: Year unit (=y=) support in Pred offsets
 * Feature: Export timeline to simple Gantt-style ASCII chart
 * Feature: Highlight critical path in timeline
