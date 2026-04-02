@@ -293,6 +293,68 @@ Point is placed at the beginning of the table."
       (should (< (string-match "Has date" content)
                  (string-match "No date" content))))))
 
+;;; --- omt--fuzzy-id-p ---
+
+(ert-deftest omt-test-fuzzy-id-p-true ()
+  "\"15?\" is a fuzzy ID."
+  (should (omt--fuzzy-id-p "15?")))
+
+(ert-deftest omt-test-fuzzy-id-p-false-plain-number ()
+  "\"15\" is not fuzzy."
+  (should-not (omt--fuzzy-id-p "15")))
+
+(ert-deftest omt-test-fuzzy-id-p-false-bare-question ()
+  "\"?\" alone is not fuzzy (no leading digits)."
+  (should-not (omt--fuzzy-id-p "?")))
+
+(ert-deftest omt-test-fuzzy-id-p-false-double-question ()
+  "\"15??\" is not fuzzy (only one trailing ? is allowed)."
+  (should-not (omt--fuzzy-id-p "15??")))
+
+;;; --- omt--fuzzy-id-base ---
+
+(ert-deftest omt-test-fuzzy-id-base ()
+  "Strip the trailing ? from a fuzzy ID."
+  (should (equal (omt--fuzzy-id-base "15?") "15")))
+
+;;; --- Integration: fuzzy ID sort placement ---
+
+(ert-deftest omt-test-sort-fuzzy-id-before-base ()
+  "A fuzzy row (\"15?\") sorts immediately before the base row (\"15\")."
+  (omt-test-with-table
+      "| ID  | Pred | Date       | Milestone     |
+|-----+------+------------+---------------|
+| 16  |      | 2025-03-01 | After fifteen |
+| 15? |      |            | Unknown pred  |
+| 15  |      | 2025-01-01 | Fifteen       |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      ;; 15? must appear before 15
+      (should (< (string-match "Unknown pred" content)
+                 (string-match "Fifteen" content)))
+      ;; 15 must appear before 16
+      (should (< (string-match "Fifteen" content)
+                 (string-match "After fifteen" content))))))
+
+(ert-deftest omt-test-sort-fuzzy-id-no-base-before-undated ()
+  "A fuzzy row with no matching base goes before other undated rows."
+  (omt-test-with-table
+      "| ID  | Pred | Date       | Milestone    |
+|-----+------+------------+--------------|
+| 1   |      | 2025-01-01 | Dated        |
+| 99? |      |            | Unknown base |
+|     |      |            | No id either |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      (should (< (string-match "Dated" content)
+                 (string-match "Unknown base" content)))
+      (should (< (string-match "Unknown base" content)
+                 (string-match "No id either" content))))))
+
 ;;; --- org-milestone-table-new ---
 
 (ert-deftest omt-test-new-table-insertion ()

@@ -137,6 +137,17 @@ Each cell is trimmed of whitespace."
    ((string-match "\\`[0-9]+\\'" p) (concat p "+0d"))
    (t p)))
 
+(defun omt--fuzzy-id-p (id)
+  "Return non-nil if ID is a fuzzy milestone ID (digits followed by `?').
+Examples: \"15?\" => t, \"15\" => nil, \"?\" => nil, \"15??\" => nil."
+  (and (stringp id)
+       (string-match-p "\\`[0-9]+\\?\\'" id)))
+
+(defun omt--fuzzy-id-base (id)
+  "Return the base ID string for a fuzzy ID (strip trailing `?').
+Assumes ID already satisfies `omt--fuzzy-id-p'."
+  (substring id 0 (1- (length id))))
+
 (defun omt--apply-offset (base op n unit)
   "Apply offset to BASE absolute date.  Return new absolute date."
   (let ((plus (string= op "+")))
@@ -399,15 +410,19 @@ starting from max+1."
 ;;;###autoload
 (defun org-milestone-table-sort-by-date ()
   "Sort data rows of the milestone table at point by the Date column.
-Rows without a date are sorted to the end."
+Rows without a date are sorted to the end.  Rows whose ID matches the
+fuzzy pattern (digits followed by `?', indicating an unknown predecessor)
+are placed immediately before the row whose ID is the base number; if that
+base row is absent, they are placed before the trailing block of undated rows."
   (interactive)
   (save-excursion
     (unless (org-at-table-p)
       (user-error "Not in a table"))
     (goto-char (org-table-begin))
     (let* ((hdr (omt--parse-header))
-           (ncols (car hdr))
-           (col-date (car (cdr (cdr (cdr hdr)))))
+           (ncols (nth 0 hdr))
+           (col-id   (nth 1 hdr))
+           (col-date (nth 3 hdr))
            (data-start nil)
            (data-end nil)
            (row-lines nil))
@@ -417,7 +432,7 @@ Rows without a date are sorted to the end."
                   (looking-at "^[ \t]*|[-+]"))
         (forward-line 1))
       (setq data-start (point))
-      ;; Collect data rows
+      ;; Collect triples: (abs-date id line-text)
       (while (and (looking-at "^[ \t]*|")
                   (not (looking-at "^[ \t]*|[-+]")))
         (let* ((ln (buffer-substring-no-properties
@@ -425,30 +440,59 @@ Rows without a date are sorted to the end."
                (cs (omt--row-cells ln))
                (dts (when (>= (length cs) ncols)
                       (string-trim (nth col-date cs))))
+               (ids (when (>= (length cs) ncols)
+                      (let ((s (string-trim (nth col-id cs))))
+                        (unless (string-empty-p s) s))))
                (abs-date (when (and dts (not (string-empty-p dts)))
                            (let ((pd (omt--parse-date dts)))
                              (when pd
                                (calendar-absolute-from-gregorian pd))))))
-          (push (cons abs-date ln) row-lines))
+          (push (list abs-date ids ln) row-lines))
         (forward-line 1))
       (setq data-end (point))
       (setq row-lines (nreverse row-lines))
-      ;; Sort: rows with dates first (ascending), then rows without dates
-      (setq row-lines
-            (sort row-lines
-                  (lambda (a b)
-                    (cond
-                     ((and (car a) (car b)) (< (car a) (car b)))
-                     ((car a) t)
-                     (t nil)))))
-      ;; Replace data rows
-      (delete-region data-start data-end)
-      (goto-char data-start)
-      (dolist (rl row-lines)
-        (insert (cdr rl) "\n"))
-      (goto-char (org-table-begin))
-      (org-table-align)
-      (message "Sorted %d row(s) by date." (length row-lines)))))
+      ;; Partition into fuzzy rows and normal rows
+      (let ((fuzzy-rows nil)
+            (normal-rows nil))
+        (dolist (r row-lines)
+          (if (omt--fuzzy-id-p (nth 1 r))
+              (push r fuzzy-rows)
+            (push r normal-rows)))
+        (setq fuzzy-rows (nreverse fuzzy-rows))
+        (setq normal-rows (nreverse normal-rows))
+        ;; Sort normal rows: dated ascending, undated last
+        (setq normal-rows
+              (sort normal-rows
+                    (lambda (a b)
+                      (cond
+                       ((and (nth 0 a) (nth 0 b)) (< (nth 0 a) (nth 0 b)))
+                       ((nth 0 a) t)
+                       (t nil)))))
+        ;; Splice each fuzzy row before its base row
+        (let ((result normal-rows))
+          (dolist (frow fuzzy-rows)
+            (let* ((base (omt--fuzzy-id-base (nth 1 frow)))
+                   (splice-pos nil)
+                   (fallback nil)
+                   (i 0))
+              (dolist (r result)
+                (when (and (null splice-pos) (equal (nth 1 r) base))
+                  (setq splice-pos i))
+                (when (and (null fallback) (null (nth 0 r)))
+                  (setq fallback i))
+                (cl-incf i))
+              (let ((pos (or splice-pos fallback i)))
+                (setq result (append (cl-subseq result 0 pos)
+                                     (list frow)
+                                     (cl-subseq result pos))))))
+          ;; Replace data rows
+          (delete-region data-start data-end)
+          (goto-char data-start)
+          (dolist (r result)
+            (insert (nth 2 r) "\n"))
+          (goto-char (org-table-begin))
+          (org-table-align)
+          (message "Sorted %d row(s) by date." (length row-lines)))))))
 
 (defun org-milestone-table-dwim ()
   "If point is in a milestone table, update it and return t.
