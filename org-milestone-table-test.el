@@ -387,5 +387,19 @@ Point is placed at the beginning of the table."
       (with-current-buffer buf
         (should (string-match-p "Unknown ID" (buffer-string)))))))
 
+(ert-deftest omt-test-fuzzy-id-no-cycle-error ()
+  "Fuzzy milestone rows do not trigger spurious cycle detection."
+  (omt-test-with-table
+      "| ID | Pred | Date       |\n|----+------+------------|\n|  5 |      | 2025-01-01 |\n| 5? |    5 |            |\n"
+    (org-milestone-table-update-timeline)
+    ;; No error buffer should appear for a valid fuzzy predecessor chain.
+    (let ((buf (get-buffer "*Milestone Table Errors*")))
+      (when buf
+        (with-current-buffer buf
+          (should-not (string-match-p "Cycle" (buffer-string))))))
+    ;; The fuzzy row's date should be resolved to the base milestone's date.
+    (goto-char (point-min))
+    (should (search-forward "2025-01-01" nil t 2))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here
