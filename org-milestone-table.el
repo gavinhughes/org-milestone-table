@@ -175,11 +175,12 @@ VISITED is list of IDs seen so far for cycle detection."
     (let ((id (plist-get row :id))
           (pred (plist-get row :pred))
           (date (plist-get row :date)))
-      ;; Cycle check
-      (when (and id (member id visited))
+      ;; Cycle check — fuzzy IDs are soft placeholders and do not
+      ;; participate in the dependency graph, so skip them here.
+      (when (and id (not (omt--fuzzy-id-p id)) (member id visited))
         (push (format "Cycle at ID %s" id) (symbol-value errs-sym))
         (cl-return-from omt--resolve nil))
-      (let ((vis (if id (cons id visited) visited)))
+      (let ((vis (if (and id (not (omt--fuzzy-id-p id))) (cons id visited) visited)))
         (cond
          ;; No predecessor: use literal date
          ((null pred)
