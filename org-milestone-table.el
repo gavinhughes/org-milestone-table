@@ -226,11 +226,7 @@ VISITED is list of IDs seen so far for cycle detection."
                                 (symbol-value errs-sym))
                           (setq failed t))
                       (let ((rabs (omt--resolve rrow tbl errs-sym vis)))
-                        (if (null rabs)
-                            (progn
-                              (push (format "Cannot resolve ID %s" rid)
-                                    (symbol-value errs-sym))
-                              (setq failed t))
+                        (when rabs
                           (push (omt--apply-offset rabs op n unit)
                                 dates))))))))
             (if (or failed (null dates))

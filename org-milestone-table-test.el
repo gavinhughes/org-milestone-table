@@ -532,6 +532,24 @@ Point is placed at the beginning of the table."
       (should (< (string-match "Root"    content)
                  (string-match "Late-dep" content))))))
 
+(ert-deftest omt-test-update-timeline-skips-undated-predecessor ()
+  "A predecessor with no date is silently skipped; other preds still resolve."
+  (omt-test-with-table
+      "| ID | Pred     | Date       | Milestone |
+|----+----------+------------+-----------|
+| 1  |          | 2025-01-01 | Start     |
+| 2  |          |            | Unknown   |
+| 3  | 1+5d,2   |            | Depends   |
+"
+    (when (get-buffer "*Milestone Table Errors*")
+      (kill-buffer "*Milestone Table Errors*"))
+    (org-milestone-table-update-timeline)
+    ;; No error buffer should have been (re)created
+    (should-not (get-buffer "*Milestone Table Errors*"))
+    ;; Row 3 resolves from row 1 only (row 2 skipped): 2025-01-06
+    (goto-char (point-min))
+    (should (search-forward "2025-01-06" nil t))))
+
 (ert-deftest omt-test-sort-undated-anchored-before-dated-dependent ()
   "An undated row is spliced just before the earliest dated row listing it as pred."
   (omt-test-with-table
