@@ -62,8 +62,13 @@ Declared as a special variable so dynamic binding works with `symbol-value'.")
   :link '(url-link "https://github.com/gavinhughes/org-milestone-table"))
 
 (defface org-milestone-table-critical-path
-  '((t :inherit highlight))
-  "Face used to highlight critical-path rows in milestone tables."
+  '((((class color) (background dark))
+     :background "#5c3300" :foreground "#ffcc88")
+    (((class color) (background light))
+     :background "#fff3cd" :foreground "#7a4100")
+    (t :inherit highlight))
+  "Face used to highlight critical-path rows in milestone tables.
+Customize the background and foreground colors to suit your theme."
   :group 'org-milestone-table)
 
 (defvar-local omt--critical-overlays nil
