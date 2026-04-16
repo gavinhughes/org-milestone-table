@@ -640,6 +640,22 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
     t))
 
 ;;;###autoload
+(defun org-milestone-table-toggle-critical-path ()
+  "Toggle critical-path row highlighting in the milestone table at point.
+Requires `org-milestone-table-update-timeline' to have been run first."
+  (interactive)
+  (cond
+   (omt--critical-overlays
+    (mapc #'delete-overlay omt--critical-overlays)
+    (setq omt--critical-overlays nil)
+    (message "Critical path highlighting off."))
+   (omt--critical-ids
+    (omt--refresh-critical-overlays)
+    (message "Critical path highlighting on."))
+   (t
+    (message "Run org-milestone-table-update-timeline first."))))
+
+;;;###autoload
 (with-eval-after-load 'org
   (add-hook 'org-ctrl-c-ctrl-c-hook #'org-milestone-table-dwim))
 

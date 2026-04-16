@@ -479,5 +479,35 @@ Point is placed at the beginning of the table."
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path))
       (should (< (overlay-start ov) (overlay-end ov))))))
 
+;;; --- org-milestone-table-toggle-critical-path ---
+
+(ert-deftest omt-test-toggle-critical-path-off-and-on ()
+  "Toggle removes overlays, then restores them."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone   |
+|----+------+------------+-------------|
+| 1  |      | 2025-01-01 | Start       |
+| 2  | 1+5d |            | Five days   |
+"
+    (org-milestone-table-update-timeline)
+    (should omt--critical-overlays)
+    ;; Toggle off
+    (org-milestone-table-toggle-critical-path)
+    (should-not omt--critical-overlays)
+    ;; Toggle on
+    (org-milestone-table-toggle-critical-path)
+    (should omt--critical-overlays)))
+
+(ert-deftest omt-test-toggle-critical-path-no-data ()
+  "Toggle before update-timeline does not error."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone   |
+|----+------+------------+-------------|
+| 1  |      | 2025-01-01 | Start       |
+"
+    (should-not (condition-case err
+                    (progn (org-milestone-table-toggle-critical-path) nil)
+                  (error err)))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here
