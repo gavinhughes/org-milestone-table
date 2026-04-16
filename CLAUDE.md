@@ -17,6 +17,8 @@ make clean          # Remove .elc files
 
 Always run `make test && make byte-compile` before considering any change done.
 
+After committing, update `CHANGELOG.org` with a dated entry describing the change.
+
 ## Project structure
 
 ```

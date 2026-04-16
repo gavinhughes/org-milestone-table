@@ -1,5 +1,30 @@
 #+title: Changelog
 
+* <2026-04-16 Thu>
+- Feature: ~org-milestone-table-highlight-critical-path~ custom variable (default ~nil~) controls whether ~C-c C-c~ automatically highlights the critical path. Use ~org-milestone-table-toggle-critical-path~ to toggle independently at any time.
+- Feature: ~org-milestone-table-critical-path~ face now has explicit light/dark theme color specs (amber palette) instead of inheriting ~highlight~, making it straightforward to customize via ~M-x customize-face~.
+
+* <2026-04-15 Tue>
+- Feature: Critical-path highlighting — after ~org-milestone-table-update-timeline~, rows on the critical path are highlighted with ~org-milestone-table-critical-path~ face.
+- Feature: ~org-milestone-table-toggle-critical-path~ command — toggle critical-path overlay highlighting on/off without recomputing dates.
+- Feature: Undated rows are topologically sorted by predecessor relationships and spliced immediately before their earliest dated dependent, rather than being placed at the end.
+- Bugfix: Silently skip undated predecessors during date resolution instead of raising an error.
+- Bugfix: ~C-c C-c~ now preserves point position after updating and sorting the table.
+
+* <2026-04-01 Wed>
+- Feature: Validation errors are displayed in a dedicated ~*org-milestone-table errors*~ buffer rather than the minibuffer.
+- Feature: Duplicate milestone IDs are now detected and reported as errors.
+- Feature: Fuzzy milestone IDs (~NNN?~) — a trailing ~?~ marks a milestone as a placeholder; fuzzy IDs are excluded from circular-reference detection and sorted after their base ID.
+
+* <2026-03-29 Sun>
+- Feature: ~org-milestone-table-dwim~ bound to ~C-c C-c~ via ~org-ctrl-c-ctrl-c-hook~; runs add-missing-IDs, update-dates, and sort-by-date in sequence.
+- Feature: ~org-milestone-table-add-missing-ids~ assigns incrementing IDs to rows that lack one.
+- Feature: ~org-milestone-table-sort-by-date~ sorts data rows by date ascending; undated rows go to the end.
+- Feature: Column label now accepts ~Pred~ or ~Predecessors~ (case-insensitive).
+- Bugfix: Wrap ~omt--resolve~ in ~cl-block~ so ~cl-return-from~ works for cycle detection.
+- Chore: Add autoload cookies, fix ~defgroup~ URL, silence byte-compiler warnings.
+- CI: Add ~package-lint~ job for MELPA compliance checks.
+
 * <2026-03-26 Mon>
 - Chore: Rename ~org-milestone-table-empty~ to ~org-milestone-table-new~.
 
