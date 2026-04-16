@@ -582,8 +582,9 @@ Cycles are tolerated: affected rows fall to the end."
 ;;;###autoload
 (defun org-milestone-table-sort-by-date ()
   "Sort data rows of the milestone table at point by the Date column.
-Rows without a date are sorted to the end, ordered by their predecessor
-relationships so that predecessors appear before their dependents.  Rows
+Undated rows that are listed as predecessors by a dated row are placed
+just before the earliest such dated row.  Remaining undated rows are
+appended at the end, ordered by their predecessor relationships.  Rows
 whose ID matches the fuzzy pattern (digits followed by `?') are placed
 immediately before the row whose ID is the base number; if that base row
 is absent, they are placed before the trailing block of undated rows."
@@ -645,11 +646,44 @@ is absent, they are placed before the trailing block of undated rows."
                        ((and (nth 0 a) (nth 0 b)) (< (nth 0 a) (nth 0 b)))
                        ((nth 0 a) t)
                        (t nil)))))
-        ;; Topo-sort the undated block
-        (let ((dated-rows   (cl-remove-if-not #'car normal-rows))
-              (undated-rows (cl-remove-if     #'car normal-rows)))
-          (setq normal-rows
-                (append dated-rows (omt--topo-sort-undated undated-rows))))
+        ;; Order undated rows: anchor those referenced by dated rows just before
+        ;; their earliest dated dependent; topo-sort the rest at the end.
+        (let* ((dated-rows     (cl-remove-if-not #'car normal-rows))
+               (undated-rows   (cl-remove-if     #'car normal-rows))
+               (undated-id-set (make-hash-table :test 'equal))
+               (anchor-map     (make-hash-table :test 'equal)))
+          (dolist (r undated-rows)
+            (when (nth 1 r) (puthash (nth 1 r) t undated-id-set)))
+          (dolist (r dated-rows)
+            (when (nth 2 r)
+              (dolist (pid (omt--collect-pred-ids (nth 2 r)))
+                (when (gethash pid undated-id-set)
+                  (let ((cur (gethash pid anchor-map)))
+                    (when (or (null cur) (< (nth 0 r) cur))
+                      (puthash pid (nth 0 r) anchor-map)))))))
+          (let ((anchor-groups (make-hash-table :test 'equal))
+                (free-rows nil))
+            (dolist (r undated-rows)
+              (let ((anchor (and (nth 1 r) (gethash (nth 1 r) anchor-map))))
+                (if anchor
+                    (puthash anchor
+                             (cons r (gethash anchor anchor-groups))
+                             anchor-groups)
+                  (push r free-rows))))
+            (setq free-rows (nreverse free-rows))
+            (let ((seen (make-hash-table :test 'equal))
+                  (result nil))
+              (dolist (r dated-rows)
+                (unless (gethash (nth 0 r) seen)
+                  (let ((group (gethash (nth 0 r) anchor-groups)))
+                    (when group
+                      (dolist (gr (omt--topo-sort-undated (nreverse group)))
+                        (push gr result))))
+                  (puthash (nth 0 r) t seen))
+                (push r result))
+              (setq normal-rows
+                    (append (nreverse result)
+                            (omt--topo-sort-undated free-rows))))))
         ;; Splice each fuzzy row before its base row
         (let ((result normal-rows))
           (dolist (frow fuzzy-rows)

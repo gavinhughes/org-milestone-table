@@ -532,6 +532,27 @@ Point is placed at the beginning of the table."
       (should (< (string-match "Root"    content)
                  (string-match "Late-dep" content))))))
 
+(ert-deftest omt-test-sort-undated-anchored-before-dated-dependent ()
+  "An undated row is spliced just before the earliest dated row listing it as pred."
+  (omt-test-with-table
+      "| ID | Pred     | Date       | Milestone |
+|----+----------+------------+-----------|
+| 37 | 36,22,23 | 2028-10-17 | Ops       |
+| 22 |          | 2028-10-17 | MLA       |
+| 23 |          | 2028-10-17 | FLA       |
+| 36 |          |            | Permit    |
+| 26 |          | 2028-04-28 | Contract  |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      ;; Undated Permit must appear before dated Ops
+      (should (< (string-match "Permit"   content)
+                 (string-match "Ops"      content)))
+      ;; Dated Contract (earlier date) still comes first
+      (should (< (string-match "Contract" content)
+                 (string-match "Permit"   content))))))
+
 ;;; --- org-milestone-table-toggle-critical-path ---
 
 (ert-deftest omt-test-toggle-critical-path-off-and-on ()
