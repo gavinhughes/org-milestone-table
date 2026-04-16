@@ -61,6 +61,18 @@ Declared as a special variable so dynamic binding works with `symbol-value'.")
   :prefix "org-milestone-table-"
   :link '(url-link "https://github.com/gavinhughes/org-milestone-table"))
 
+(defface org-milestone-table-critical-path
+  '((t :inherit highlight))
+  "Face used to highlight critical-path rows in milestone tables."
+  :group 'org-milestone-table)
+
+(defvar-local omt--critical-overlays nil
+  "List of overlays applied by critical-path highlighting.")
+
+(defvar-local omt--critical-ids nil
+  "Hash set of IDs on the critical path.
+Set by `org-milestone-table-update-timeline'.")
+
 ;;;###autoload
 (defun org-milestone-table-new ()
   "Insert an empty milestone table at point."
@@ -225,6 +237,113 @@ VISITED is list of IDs seen so far for cycle detection."
                 nil
               (apply #'max dates)))))))))
 
+(defun omt--collect-pred-ids (pred)
+  "Return list of milestone ID strings referenced in PRED."
+  (let ((ids nil))
+    (dolist (p (omt--parse-pred-list pred))
+      (let ((pn (omt--normalize-pred p)))
+        (when (string-match "\\`\\([0-9]+\\)[+-]" pn)
+          (push (match-string 1 pn) ids))))
+    ids))
+
+(defun omt--compute-critical-path (id-to-row id-to-abs)
+  "Return a hash set of IDs on the critical path.
+ID-TO-ROW maps string ID -> row plist.
+ID-TO-ABS maps string ID -> absolute date integer."
+  (let ((referenced (make-hash-table :test 'equal)))
+    (maphash (lambda (_id row)
+               (when (plist-get row :pred)
+                 (dolist (rid (omt--collect-pred-ids (plist-get row :pred)))
+                   (puthash rid t referenced))))
+             id-to-row)
+    (let ((max-abs nil)
+          (leaves nil))
+      (maphash (lambda (id abs)
+                 (unless (or (omt--fuzzy-id-p id)
+                             (gethash id referenced))
+                   (push (cons id abs) leaves)
+                   (when (or (null max-abs) (> abs max-abs))
+                     (setq max-abs abs))))
+               id-to-abs)
+      (if (null max-abs)
+          (make-hash-table :test 'equal)
+        (let ((critical (make-hash-table :test 'equal))
+              (queue nil))
+          (dolist (pair leaves)
+            (when (= (cdr pair) max-abs)
+              (puthash (car pair) t critical)
+              (push (car pair) queue)))
+          (while queue
+            (let* ((cur-id (pop queue))
+                   (cur-row (gethash cur-id id-to-row))
+                   (cur-abs (gethash cur-id id-to-abs))
+                   (pred-str (and cur-row (plist-get cur-row :pred))))
+              (when pred-str
+                (dolist (p (omt--parse-pred-list pred-str))
+                  (let ((pn (omt--normalize-pred p)))
+                    (when (string-match
+                           "\\`\\([0-9]+\\)\\([+-]\\)\\([0-9]+\\)\\([dwm]\\)\\'"
+                           pn)
+                      (let* ((rid  (match-string 1 pn))
+                             (op   (match-string 2 pn))
+                             (n    (string-to-number (match-string 3 pn)))
+                             (unit (match-string 4 pn))
+                             (rabs (gethash rid id-to-abs)))
+                        (when (and rabs
+                                   (= (omt--apply-offset rabs op n unit)
+                                      cur-abs))
+                          (unless (gethash rid critical)
+                            (puthash rid t critical)
+                            (push rid queue))))))))))
+          critical)))))
+
+(defun omt--apply-critical-overlays (critical id-to-row)
+  "Highlight critical-path rows with overlays.
+CRITICAL is a hash set of IDs.  ID-TO-ROW maps ID -> row plist."
+  (mapc #'delete-overlay omt--critical-overlays)
+  (setq omt--critical-overlays nil)
+  (maphash (lambda (id _)
+             (let* ((row (gethash id id-to-row))
+                    (lb  (and row (plist-get row :line-beg))))
+               (when lb
+                 (let* ((le (save-excursion
+                              (goto-char lb)
+                              (line-end-position)))
+                        (ov (make-overlay lb le)))
+                   (overlay-put ov 'face 'org-milestone-table-critical-path)
+                   (overlay-put ov 'org-milestone-table-critical t)
+                   (push ov omt--critical-overlays)))))
+           critical))
+
+(defun omt--reparse-id-positions ()
+  "Return a fresh hash table mapping ID -> minimal plist with :id and :line-beg.
+Used to reapply overlays after the table rows have been reordered."
+  (save-excursion
+    (goto-char (org-table-begin))
+    (let* ((hdr (omt--parse-header))
+           (ncols (car hdr))
+           (col-id (cadr hdr))
+           (result (make-hash-table :test 'equal)))
+      (forward-line 1)
+      (while (and (looking-at "^[ \t]*|") (looking-at "^[ \t]*|[-+]"))
+        (forward-line 1))
+      (while (and (looking-at "^[ \t]*|") (not (looking-at "^[ \t]*|[-+]")))
+        (let* ((lb (point))
+               (ln (buffer-substring-no-properties lb (line-end-position)))
+               (cs (omt--row-cells ln)))
+          (when (>= (length cs) ncols)
+            (let ((id (string-trim (nth col-id cs))))
+              (unless (string-empty-p id)
+                (puthash id (list :id id :line-beg lb) result)))))
+        (forward-line 1))
+      result)))
+
+(defun omt--refresh-critical-overlays ()
+  "Reapply critical-path overlays using the current buffer positions.
+Uses `omt--critical-ids' set by the last `org-milestone-table-update-timeline'."
+  (when omt--critical-ids
+    (omt--apply-critical-overlays omt--critical-ids (omt--reparse-id-positions))))
+
 (defun omt--display-errors (errors)
   "Display ERRORS in a dedicated read-only buffer and pop it up."
   (let ((buf (get-buffer-create "*Milestone Table Errors*")))
@@ -286,11 +405,15 @@ VISITED is list of IDs seen so far for cycle detection."
         (forward-line 1))
       (setq rows (nreverse rows))
       ;; Resolve and collect updates
-      (let ((updates nil))
+      (let ((updates nil)
+            (id-to-abs (make-hash-table :test 'equal)))
         (dolist (r rows)
-          (when (plist-get r :pred)
-            (let ((a (omt--resolve r id-to-row errs-sym nil)))
-              (when a
+          (let ((a (omt--resolve r id-to-row errs-sym nil)))
+            (when a
+              (when (and (plist-get r :id)
+                         (not (omt--fuzzy-id-p (plist-get r :id))))
+                (puthash (plist-get r :id) a id-to-abs))
+              (when (plist-get r :pred)
                 (push (cons (plist-get r :line-beg)
                             (omt--format-date
                              (calendar-gregorian-from-absolute a)))
@@ -329,6 +452,9 @@ VISITED is list of IDs seen so far for cycle detection."
                   (insert nc)))))
           (goto-char (org-table-begin))
           (org-table-align)
+          (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
+            (setq omt--critical-ids cp)
+            (omt--apply-critical-overlays cp id-to-row))
           (message "Updated %d date(s)." (length updates)))))))
 
 ;;;###autoload
@@ -510,6 +636,7 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
     (org-milestone-table-add-missing-ids)
     (org-milestone-table-update-timeline)
     (org-milestone-table-sort-by-date)
+    (omt--refresh-critical-overlays)
     t))
 
 ;;;###autoload

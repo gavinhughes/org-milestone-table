@@ -401,5 +401,83 @@ Point is placed at the beginning of the table."
     (goto-char (point-min))
     (should (search-forward "2025-01-01" nil t 2))))
 
+;;; --- omt--collect-pred-ids ---
+
+(ert-deftest omt-test-collect-pred-ids ()
+  "Extract referenced IDs from a predecessor string."
+  (let ((ids (omt--collect-pred-ids "1+5d,2+3w")))
+    (should (member "1" ids))
+    (should (member "2" ids))))
+
+;;; --- omt--compute-critical-path ---
+
+(ert-deftest omt-test-compute-critical-path-linear ()
+  "Linear chain 1->2->3: all three IDs are on the critical path."
+  (let ((id-to-row (make-hash-table :test 'equal))
+        (id-to-abs (make-hash-table :test 'equal))
+        (d1 (calendar-absolute-from-gregorian '(1 1 2025)))
+        (d2 (calendar-absolute-from-gregorian '(1 6 2025)))
+        (d3 (calendar-absolute-from-gregorian '(1 11 2025))))
+    (puthash "1" (list :id "1" :pred nil  :date "2025-01-01") id-to-row)
+    (puthash "2" (list :id "2" :pred "1+5d" :date nil)        id-to-row)
+    (puthash "3" (list :id "3" :pred "2+5d" :date nil)        id-to-row)
+    (puthash "1" d1 id-to-abs)
+    (puthash "2" d2 id-to-abs)
+    (puthash "3" d3 id-to-abs)
+    (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
+      (should (gethash "1" cp))
+      (should (gethash "2" cp))
+      (should (gethash "3" cp)))))
+
+(ert-deftest omt-test-compute-critical-path-branch ()
+  "Branching: 1->3 (+10d) beats 1->2->3 (+5d+3d); critical path is {1,3}."
+  (let ((id-to-row (make-hash-table :test 'equal))
+        (id-to-abs (make-hash-table :test 'equal))
+        (d1 (calendar-absolute-from-gregorian '(1 1 2025)))
+        (d2 (calendar-absolute-from-gregorian '(1 6 2025)))
+        (d3 (calendar-absolute-from-gregorian '(1 11 2025))))
+    (puthash "1" (list :id "1" :pred nil          :date "2025-01-01") id-to-row)
+    (puthash "2" (list :id "2" :pred "1+5d"        :date nil)         id-to-row)
+    (puthash "3" (list :id "3" :pred "1+10d,2+3d"  :date nil)         id-to-row)
+    (puthash "1" d1 id-to-abs)
+    (puthash "2" d2 id-to-abs)
+    (puthash "3" d3 id-to-abs)
+    (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
+      (should     (gethash "1" cp))
+      (should-not (gethash "2" cp))
+      (should     (gethash "3" cp)))))
+
+;;; --- Integration: critical path overlays ---
+
+(ert-deftest omt-test-update-timeline-highlights-critical-path ()
+  "After update-timeline, critical-path rows get overlays."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone   |
+|----+------+------------+-------------|
+| 1  |      | 2025-01-01 | Start       |
+| 2  | 1+5d |            | Five days   |
+"
+    (org-milestone-table-update-timeline)
+    ;; At least one overlay should be present
+    (should omt--critical-overlays)
+    ;; Every overlay should carry the critical-path face
+    (dolist (ov omt--critical-overlays)
+      (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path)))))
+
+(ert-deftest omt-test-dwim-highlights-critical-path-after-sort ()
+  "After C-c C-c (dwim), critical-path overlays survive the sort step."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone   |
+|----+------+------------+-------------|
+| 2  | 1+5d |            | Five days   |
+| 1  |      | 2025-01-01 | Start       |
+"
+    (org-milestone-table-dwim)
+    ;; Overlays should be present and on visible (non-zero-width) regions
+    (should omt--critical-overlays)
+    (dolist (ov omt--critical-overlays)
+      (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path))
+      (should (< (overlay-start ov) (overlay-end ov))))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here
