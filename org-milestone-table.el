@@ -534,13 +534,59 @@ starting from max+1."
         (org-table-align)
         (message "Added %d ID(s), starting from %d." count (1+ max-id))))))
 
+(defun omt--topo-sort-undated (rows)
+  "Sort undated ROWS so predecessors appear before their dependents.
+ROWS is a list of (abs-date id pred-str line-text) quadruples, all undated.
+Rows without IDs are appended after the sorted block unchanged.
+Cycles are tolerated: affected rows fall to the end."
+  (let ((id-set     (make-hash-table :test 'equal))
+        (in-degree  (make-hash-table :test 'equal))
+        (dependents (make-hash-table :test 'equal))
+        (id-rows nil)
+        (no-id-rows nil))
+    (dolist (r rows)
+      (if (nth 1 r) (push r id-rows) (push r no-id-rows)))
+    (setq id-rows    (nreverse id-rows))
+    (setq no-id-rows (nreverse no-id-rows))
+    (dolist (r id-rows)
+      (puthash (nth 1 r) r id-set)
+      (puthash (nth 1 r) 0 in-degree))
+    (dolist (r id-rows)
+      (when (nth 2 r)
+        (dolist (pid (omt--collect-pred-ids (nth 2 r)))
+          (when (gethash pid id-set)
+            (puthash (nth 1 r) (1+ (gethash (nth 1 r) in-degree)) in-degree)
+            (puthash pid (cons (nth 1 r) (gethash pid dependents)) dependents)))))
+    (let ((queue nil)
+          (result nil)
+          (processed (make-hash-table :test 'equal)))
+      (dolist (r id-rows)
+        (when (= (gethash (nth 1 r) in-degree) 0)
+          (push (nth 1 r) queue)))
+      (while queue
+        (let* ((cur-id (pop queue))
+               (cur-row (gethash cur-id id-set)))
+          (push cur-row result)
+          (puthash cur-id t processed)
+          (dolist (dep-id (gethash cur-id dependents))
+            (let ((d (1- (gethash dep-id in-degree))))
+              (puthash dep-id d in-degree)
+              (when (= d 0)
+                (push dep-id queue))))))
+      ;; Append any remaining rows (cycles)
+      (dolist (r id-rows)
+        (unless (gethash (nth 1 r) processed)
+          (push r result)))
+      (append (nreverse result) no-id-rows))))
+
 ;;;###autoload
 (defun org-milestone-table-sort-by-date ()
   "Sort data rows of the milestone table at point by the Date column.
-Rows without a date are sorted to the end.  Rows whose ID matches the
-fuzzy pattern (digits followed by `?', indicating an unknown predecessor)
-are placed immediately before the row whose ID is the base number; if that
-base row is absent, they are placed before the trailing block of undated rows."
+Rows without a date are sorted to the end, ordered by their predecessor
+relationships so that predecessors appear before their dependents.  Rows
+whose ID matches the fuzzy pattern (digits followed by `?') are placed
+immediately before the row whose ID is the base number; if that base row
+is absent, they are placed before the trailing block of undated rows."
   (interactive)
   (save-excursion
     (unless (org-at-table-p)
@@ -549,6 +595,7 @@ base row is absent, they are placed before the trailing block of undated rows."
     (let* ((hdr (omt--parse-header))
            (ncols (nth 0 hdr))
            (col-id   (nth 1 hdr))
+           (col-pred (nth 2 hdr))
            (col-date (nth 3 hdr))
            (data-start nil)
            (data-end nil)
@@ -559,7 +606,7 @@ base row is absent, they are placed before the trailing block of undated rows."
                   (looking-at "^[ \t]*|[-+]"))
         (forward-line 1))
       (setq data-start (point))
-      ;; Collect triples: (abs-date id line-text)
+      ;; Collect quadruples: (abs-date id pred-str line-text)
       (while (and (looking-at "^[ \t]*|")
                   (not (looking-at "^[ \t]*|[-+]")))
         (let* ((ln (buffer-substring-no-properties
@@ -570,11 +617,14 @@ base row is absent, they are placed before the trailing block of undated rows."
                (ids (when (>= (length cs) ncols)
                       (let ((s (string-trim (nth col-id cs))))
                         (unless (string-empty-p s) s))))
+               (pds (when (>= (length cs) ncols)
+                      (let ((s (string-trim (nth col-pred cs))))
+                        (unless (string-empty-p s) s))))
                (abs-date (when (and dts (not (string-empty-p dts)))
                            (let ((pd (omt--parse-date dts)))
                              (when pd
                                (calendar-absolute-from-gregorian pd))))))
-          (push (list abs-date ids ln) row-lines))
+          (push (list abs-date ids pds ln) row-lines))
         (forward-line 1))
       (setq data-end (point))
       (setq row-lines (nreverse row-lines))
@@ -595,6 +645,11 @@ base row is absent, they are placed before the trailing block of undated rows."
                        ((and (nth 0 a) (nth 0 b)) (< (nth 0 a) (nth 0 b)))
                        ((nth 0 a) t)
                        (t nil)))))
+        ;; Topo-sort the undated block
+        (let ((dated-rows   (cl-remove-if-not #'car normal-rows))
+              (undated-rows (cl-remove-if     #'car normal-rows)))
+          (setq normal-rows
+                (append dated-rows (omt--topo-sort-undated undated-rows))))
         ;; Splice each fuzzy row before its base row
         (let ((result normal-rows))
           (dolist (frow fuzzy-rows)
@@ -616,7 +671,7 @@ base row is absent, they are placed before the trailing block of undated rows."
           (delete-region data-start data-end)
           (goto-char data-start)
           (dolist (r result)
-            (insert (nth 2 r) "\n"))
+            (insert (nth 3 r) "\n"))
           (goto-char (org-table-begin))
           (org-table-align)
           (message "Sorted %d row(s) by date." (length row-lines)))))))

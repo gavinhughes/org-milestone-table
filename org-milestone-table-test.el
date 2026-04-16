@@ -479,6 +479,59 @@ Point is placed at the beginning of the table."
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path))
       (should (< (overlay-start ov) (overlay-end ov))))))
 
+;;; --- omt--topo-sort-undated / undated ordering ---
+
+(ert-deftest omt-test-sort-undated-predecessor-before-dependent ()
+  "Undated predecessor X sorts before its undated dependent Y."
+  (omt-test-with-table
+      "| ID | Pred | Date | Milestone |
+|----+------+------+-----------|
+| 2  | 1+5d |      | Y         |
+| 1  |      |      | X         |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      (should (< (string-match "| X" content)
+                 (string-match "| Y" content))))))
+
+(ert-deftest omt-test-sort-undated-chain ()
+  "Undated chain A->B->C sorts in dependency order."
+  (omt-test-with-table
+      "| ID | Pred | Date | Milestone |
+|----+------+------+-----------|
+| 3  | 2+1d |      | C         |
+| 1  |      |      | A         |
+| 2  | 1+1d |      | B         |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      (should (< (string-match "| A" content)
+                 (string-match "| B" content)))
+      (should (< (string-match "| B" content)
+                 (string-match "| C" content))))))
+
+(ert-deftest omt-test-sort-undated-no-regression-dated-rows ()
+  "Dated rows still sort ascending; undated follow in dependency order."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone |
+|----+------+------------+-----------|
+| 4  | 3+1d |            | Late-dep  |
+| 2  |      | 2025-06-01 | Later     |
+| 3  |      |            | Root      |
+| 1  |      | 2025-01-01 | Earlier   |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      ;; Dated rows in ascending order
+      (should (< (string-match "Earlier" content)
+                 (string-match "Later"   content)))
+      ;; Undated root before its dependent
+      (should (< (string-match "Root"    content)
+                 (string-match "Late-dep" content))))))
+
 ;;; --- org-milestone-table-toggle-critical-path ---
 
 (ert-deftest omt-test-toggle-critical-path-off-and-on ()
