@@ -61,6 +61,13 @@ Declared as a special variable so dynamic binding works with `symbol-value'.")
   :prefix "org-milestone-table-"
   :link '(url-link "https://github.com/gavinhughes/org-milestone-table"))
 
+(defcustom org-milestone-table-highlight-critical-path nil
+  "When non-nil, highlight critical-path rows after each timeline update.
+The critical path can always be toggled manually with
+`org-milestone-table-toggle-critical-path'."
+  :type 'boolean
+  :group 'org-milestone-table)
+
 (defface org-milestone-table-critical-path
   '((((class color) (background dark))
      :background "#5c3300" :foreground "#ffcc88")
@@ -453,9 +460,10 @@ Uses `omt--critical-ids' set by the last `org-milestone-table-update-timeline'."
                   (insert nc)))))
           (goto-char (org-table-begin))
           (org-table-align)
-          (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
-            (setq omt--critical-ids cp)
-            (omt--apply-critical-overlays cp id-to-row))
+          (when org-milestone-table-highlight-critical-path
+            (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
+              (setq omt--critical-ids cp)
+              (omt--apply-critical-overlays cp id-to-row)))
           (message "Updated %d date(s)." (length updates)))))))
 
 ;;;###autoload

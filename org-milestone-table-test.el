@@ -450,14 +450,15 @@ Point is placed at the beginning of the table."
 ;;; --- Integration: critical path overlays ---
 
 (ert-deftest omt-test-update-timeline-highlights-critical-path ()
-  "After update-timeline, critical-path rows get overlays."
+  "After update-timeline with highlight enabled, critical-path rows get overlays."
   (omt-test-with-table
       "| ID | Pred | Date       | Milestone   |
 |----+------+------------+-------------|
 | 1  |      | 2025-01-01 | Start       |
 | 2  | 1+5d |            | Five days   |
 "
-    (org-milestone-table-update-timeline)
+    (let ((org-milestone-table-highlight-critical-path t))
+      (org-milestone-table-update-timeline))
     ;; At least one overlay should be present
     (should omt--critical-overlays)
     ;; Every overlay should carry the critical-path face
@@ -465,19 +466,32 @@ Point is placed at the beginning of the table."
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path)))))
 
 (ert-deftest omt-test-dwim-highlights-critical-path-after-sort ()
-  "After C-c C-c (dwim), critical-path overlays survive the sort step."
+  "After C-c C-c (dwim) with highlight enabled, critical-path overlays survive the sort step."
   (omt-test-with-table
       "| ID | Pred | Date       | Milestone   |
 |----+------+------------+-------------|
 | 2  | 1+5d |            | Five days   |
 | 1  |      | 2025-01-01 | Start       |
 "
-    (org-milestone-table-dwim)
+    (let ((org-milestone-table-highlight-critical-path t))
+      (org-milestone-table-dwim))
     ;; Overlays should be present and on visible (non-zero-width) regions
     (should omt--critical-overlays)
     (dolist (ov omt--critical-overlays)
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path))
       (should (< (overlay-start ov) (overlay-end ov))))))
+
+(ert-deftest omt-test-update-timeline-no-highlight-when-disabled ()
+  "With `org-milestone-table-highlight-critical-path' nil, no overlays are applied."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone   |
+|----+------+------------+-------------|
+| 1  |      | 2025-01-01 | Start       |
+| 2  | 1+5d |            | Five days   |
+"
+    (let ((org-milestone-table-highlight-critical-path nil))
+      (org-milestone-table-update-timeline))
+    (should-not omt--critical-overlays)))
 
 ;;; --- omt--topo-sort-undated / undated ordering ---
 
@@ -581,7 +595,8 @@ Point is placed at the beginning of the table."
 | 1  |      | 2025-01-01 | Start       |
 | 2  | 1+5d |            | Five days   |
 "
-    (org-milestone-table-update-timeline)
+    (let ((org-milestone-table-highlight-critical-path t))
+      (org-milestone-table-update-timeline))
     (should omt--critical-overlays)
     ;; Toggle off
     (org-milestone-table-toggle-critical-path)
