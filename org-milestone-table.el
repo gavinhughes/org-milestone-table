@@ -718,11 +718,17 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
                (condition-case nil
                    (progn (omt--parse-header) t)
                  (user-error nil))))
-    (save-excursion
+    (let* ((col (org-table-current-column))
+           (row-offset (- (line-number-at-pos)
+                          (line-number-at-pos (org-table-begin)))))
       (org-milestone-table-add-missing-ids)
       (org-milestone-table-update-timeline)
       (org-milestone-table-sort-by-date)
-      (omt--refresh-critical-overlays))
+      (omt--refresh-critical-overlays)
+      (goto-char (org-table-begin))
+      (forward-line row-offset)
+      (when (org-at-table-p)
+        (org-table-goto-column col)))
     t))
 
 ;;;###autoload
