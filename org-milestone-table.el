@@ -718,10 +718,11 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
                (condition-case nil
                    (progn (omt--parse-header) t)
                  (user-error nil))))
-    (org-milestone-table-add-missing-ids)
-    (org-milestone-table-update-timeline)
-    (org-milestone-table-sort-by-date)
-    (omt--refresh-critical-overlays)
+    (save-excursion
+      (org-milestone-table-add-missing-ids)
+      (org-milestone-table-update-timeline)
+      (org-milestone-table-sort-by-date)
+      (omt--refresh-critical-overlays))
     t))
 
 ;;;###autoload
