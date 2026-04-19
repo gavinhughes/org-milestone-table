@@ -588,33 +588,35 @@ Point is placed at the beginning of the table."
 ;;; --- org-milestone-table-toggle-critical-path ---
 
 (ert-deftest omt-test-toggle-critical-path-off-and-on ()
-  "Toggle removes overlays, then restores them."
+  "Toggle turns highlighting on, then off, then on again without a prior update-timeline call."
   (omt-test-with-table
       "| ID | Pred | Date       | Milestone   |
 |----+------+------------+-------------|
 | 1  |      | 2025-01-01 | Start       |
 | 2  | 1+5d |            | Five days   |
 "
-    (let ((org-milestone-table-highlight-critical-path t))
-      (org-milestone-table-update-timeline))
-    (should (omt--current-table-overlays))
-    ;; Toggle off
-    (org-milestone-table-toggle-critical-path)
-    (should-not (omt--current-table-overlays))
-    ;; Toggle on
-    (org-milestone-table-toggle-critical-path)
-    (should (omt--current-table-overlays))))
+    (let ((org-milestone-table-highlight-critical-path nil))
+      ;; First toggle: no prior state → turns on.
+      (org-milestone-table-toggle-critical-path)
+      (should (omt--current-table-overlays))
+      ;; Second toggle: overlays present → turns off.
+      (org-milestone-table-toggle-critical-path)
+      (should-not (omt--current-table-overlays))
+      ;; Third toggle: no overlays, data present → turns on again.
+      (org-milestone-table-toggle-critical-path)
+      (should (omt--current-table-overlays)))))
 
-(ert-deftest omt-test-toggle-critical-path-no-data ()
-  "Toggle before update-timeline does not error."
+(ert-deftest omt-test-toggle-critical-path-no-prior-update ()
+  "Toggle runs update-timeline itself and does not error when called cold."
   (omt-test-with-table
       "| ID | Pred | Date       | Milestone   |
 |----+------+------------+-------------|
 | 1  |      | 2025-01-01 | Start       |
 "
-    (should-not (condition-case err
-                    (progn (org-milestone-table-toggle-critical-path) nil)
-                  (error err)))))
+    (let ((org-milestone-table-highlight-critical-path nil))
+      (should-not (condition-case err
+                      (progn (org-milestone-table-toggle-critical-path) nil)
+                    (error err))))))
 
 (ert-deftest omt-test-critical-path-independent-across-tables ()
   "Updating a second table does not remove overlays from the first table."

@@ -470,9 +470,9 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
                   (insert nc)))))
           (goto-char (org-table-begin))
           (org-table-align)
-          (when org-milestone-table-highlight-critical-path
-            (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
-              (setcar (cddr (omt--table-state (org-table-begin))) cp)
+          (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
+            (setcar (cddr (omt--table-state (org-table-begin))) cp)
+            (when org-milestone-table-highlight-critical-path
               (omt--apply-critical-overlays cp id-to-row)))
           (message "Updated %d date(s)." (length updates)))))))
 
@@ -757,21 +757,20 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
 ;;;###autoload
 (defun org-milestone-table-toggle-critical-path ()
   "Toggle critical-path row highlighting in the milestone table at point.
-Requires `org-milestone-table-update-timeline' to have been run first."
+Always runs `org-milestone-table-update-timeline' first."
   (interactive)
   (let* ((entry (omt--table-state (org-table-begin)))
-         (overlays (cadr entry))
-         (critical-ids (caddr entry)))
-    (cond
-     (overlays
-      (mapc #'delete-overlay overlays)
-      (setcar (cdr entry) nil)
-      (message "Critical path highlighting off."))
-     (critical-ids
-      (omt--refresh-critical-overlays)
-      (message "Critical path highlighting on."))
-     (t
-      (message "Run org-milestone-table-update-timeline first.")))))
+         (was-showing (cadr entry)))
+    (org-milestone-table-update-timeline)
+    (setq entry (omt--table-state (org-table-begin)))
+    (if was-showing
+        (progn
+          (mapc #'delete-overlay (cadr entry))
+          (setcar (cdr entry) nil)
+          (message "Critical path highlighting off."))
+      (unless (cadr entry)
+        (omt--refresh-critical-overlays))
+      (message "Critical path highlighting on."))))
 
 ;;;###autoload
 (with-eval-after-load 'org
