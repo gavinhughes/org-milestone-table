@@ -460,9 +460,9 @@ Point is placed at the beginning of the table."
     (let ((org-milestone-table-highlight-critical-path t))
       (org-milestone-table-update-timeline))
     ;; At least one overlay should be present
-    (should omt--critical-overlays)
+    (should (omt--current-table-overlays))
     ;; Every overlay should carry the critical-path face
-    (dolist (ov omt--critical-overlays)
+    (dolist (ov (omt--current-table-overlays))
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path)))))
 
 (ert-deftest omt-test-dwim-highlights-critical-path-after-sort ()
@@ -476,8 +476,8 @@ Point is placed at the beginning of the table."
     (let ((org-milestone-table-highlight-critical-path t))
       (org-milestone-table-dwim))
     ;; Overlays should be present and on visible (non-zero-width) regions
-    (should omt--critical-overlays)
-    (dolist (ov omt--critical-overlays)
+    (should (omt--current-table-overlays))
+    (dolist (ov (omt--current-table-overlays))
       (should (eq (overlay-get ov 'face) 'org-milestone-table-critical-path))
       (should (< (overlay-start ov) (overlay-end ov))))))
 
@@ -491,7 +491,7 @@ Point is placed at the beginning of the table."
 "
     (let ((org-milestone-table-highlight-critical-path nil))
       (org-milestone-table-update-timeline))
-    (should-not omt--critical-overlays)))
+    (should-not (omt--current-table-overlays))))
 
 ;;; --- omt--topo-sort-undated / undated ordering ---
 
@@ -597,13 +597,13 @@ Point is placed at the beginning of the table."
 "
     (let ((org-milestone-table-highlight-critical-path t))
       (org-milestone-table-update-timeline))
-    (should omt--critical-overlays)
+    (should (omt--current-table-overlays))
     ;; Toggle off
     (org-milestone-table-toggle-critical-path)
-    (should-not omt--critical-overlays)
+    (should-not (omt--current-table-overlays))
     ;; Toggle on
     (org-milestone-table-toggle-critical-path)
-    (should omt--critical-overlays)))
+    (should (omt--current-table-overlays))))
 
 (ert-deftest omt-test-toggle-critical-path-no-data ()
   "Toggle before update-timeline does not error."
@@ -615,6 +615,38 @@ Point is placed at the beginning of the table."
     (should-not (condition-case err
                     (progn (org-milestone-table-toggle-critical-path) nil)
                   (error err)))))
+
+(ert-deftest omt-test-critical-path-independent-across-tables ()
+  "Updating a second table does not remove overlays from the first table."
+  (with-temp-buffer
+    (org-mode)
+    (insert "| ID | Pred | Date       | Milestone |
+|----+------+------------+-----------|
+| 1  |      | 2025-01-01 | Start     |
+| 2  | 1+5d |            | Five days |
+
+| ID | Pred | Date       | Milestone  |
+|----+------+------------+------------|
+| 1  |      | 2025-06-01 | Begin      |
+| 2  | 1+3d |            | Three days |
+")
+    (let ((org-milestone-table-highlight-critical-path t))
+      ;; Update the first table.
+      (goto-char (point-min))
+      (re-search-forward "^[ \t]*|")
+      (beginning-of-line)
+      (org-milestone-table-update-timeline)
+      (let ((ovs-table1 (omt--current-table-overlays)))
+        (should ovs-table1)
+        ;; Move past table 1 and find table 2.
+        (goto-char (org-table-end))
+        (re-search-forward "^[ \t]*|")
+        (beginning-of-line)
+        (org-milestone-table-update-timeline)
+        ;; First table overlays must still be live.
+        (should (cl-every #'overlay-buffer ovs-table1))
+        ;; Second table also has its own overlays.
+        (should (omt--current-table-overlays))))))
 
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here

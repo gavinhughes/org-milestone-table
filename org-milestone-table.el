@@ -78,12 +78,20 @@ The critical path can always be toggled manually with
 Customize the background and foreground colors to suit your theme."
   :group 'org-milestone-table)
 
-(defvar-local omt--critical-overlays nil
-  "List of overlays applied by critical-path highlighting.")
+(defvar-local omt--table-states nil
+  "Alist of (TABLE-BEG-MARKER OVERLAYS CRITICAL-IDS) per table in buffer.")
 
-(defvar-local omt--critical-ids nil
-  "Hash set of IDs on the critical path.
-Set by `org-milestone-table-update-timeline'.")
+(defun omt--table-state (table-beg)
+  "Return or create the state list for TABLE-BEG in `omt--table-states'."
+  (or (cl-find-if (lambda (e) (= (marker-position (car e)) table-beg))
+                  omt--table-states)
+      (let ((entry (list (copy-marker table-beg) nil nil)))
+        (push entry omt--table-states)
+        entry)))
+
+(defun omt--current-table-overlays ()
+  "Return critical-path overlays for the table at point."
+  (cadr (omt--table-state (org-table-begin))))
 
 ;;;###autoload
 (defun org-milestone-table-new ()
@@ -308,20 +316,21 @@ ID-TO-ABS maps string ID -> absolute date integer."
 (defun omt--apply-critical-overlays (critical id-to-row)
   "Highlight critical-path rows with overlays.
 CRITICAL is a hash set of IDs.  ID-TO-ROW maps ID -> row plist."
-  (mapc #'delete-overlay omt--critical-overlays)
-  (setq omt--critical-overlays nil)
-  (maphash (lambda (id _)
-             (let* ((row (gethash id id-to-row))
-                    (lb  (and row (plist-get row :line-beg))))
-               (when lb
-                 (let* ((le (save-excursion
-                              (goto-char lb)
-                              (line-end-position)))
-                        (ov (make-overlay lb le)))
-                   (overlay-put ov 'face 'org-milestone-table-critical-path)
-                   (overlay-put ov 'org-milestone-table-critical t)
-                   (push ov omt--critical-overlays)))))
-           critical))
+  (let ((entry (omt--table-state (org-table-begin))))
+    (mapc #'delete-overlay (cadr entry))
+    (setcar (cdr entry) nil)
+    (maphash (lambda (id _)
+               (let* ((row (gethash id id-to-row))
+                      (lb  (and row (plist-get row :line-beg))))
+                 (when lb
+                   (let* ((le (save-excursion
+                                (goto-char lb)
+                                (line-end-position)))
+                          (ov (make-overlay lb le)))
+                     (overlay-put ov 'face 'org-milestone-table-critical-path)
+                     (overlay-put ov 'org-milestone-table-critical t)
+                     (push ov (cadr entry))))))
+             critical)))
 
 (defun omt--reparse-id-positions ()
   "Return a fresh hash table mapping ID -> minimal plist with :id and :line-beg.
@@ -348,9 +357,10 @@ Used to reapply overlays after the table rows have been reordered."
 
 (defun omt--refresh-critical-overlays ()
   "Reapply critical-path overlays using the current buffer positions.
-Uses `omt--critical-ids' set by the last `org-milestone-table-update-timeline'."
-  (when omt--critical-ids
-    (omt--apply-critical-overlays omt--critical-ids (omt--reparse-id-positions))))
+Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
+  (let ((critical-ids (caddr (omt--table-state (org-table-begin)))))
+    (when critical-ids
+      (omt--apply-critical-overlays critical-ids (omt--reparse-id-positions)))))
 
 (defun omt--display-errors (errors)
   "Display ERRORS in a dedicated read-only buffer and pop it up."
@@ -462,7 +472,7 @@ Uses `omt--critical-ids' set by the last `org-milestone-table-update-timeline'."
           (org-table-align)
           (when org-milestone-table-highlight-critical-path
             (let ((cp (omt--compute-critical-path id-to-row id-to-abs)))
-              (setq omt--critical-ids cp)
+              (setcar (cddr (omt--table-state (org-table-begin))) cp)
               (omt--apply-critical-overlays cp id-to-row)))
           (message "Updated %d date(s)." (length updates)))))))
 
@@ -749,16 +759,19 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
   "Toggle critical-path row highlighting in the milestone table at point.
 Requires `org-milestone-table-update-timeline' to have been run first."
   (interactive)
-  (cond
-   (omt--critical-overlays
-    (mapc #'delete-overlay omt--critical-overlays)
-    (setq omt--critical-overlays nil)
-    (message "Critical path highlighting off."))
-   (omt--critical-ids
-    (omt--refresh-critical-overlays)
-    (message "Critical path highlighting on."))
-   (t
-    (message "Run org-milestone-table-update-timeline first."))))
+  (let* ((entry (omt--table-state (org-table-begin)))
+         (overlays (cadr entry))
+         (critical-ids (caddr entry)))
+    (cond
+     (overlays
+      (mapc #'delete-overlay overlays)
+      (setcar (cdr entry) nil)
+      (message "Critical path highlighting off."))
+     (critical-ids
+      (omt--refresh-critical-overlays)
+      (message "Critical path highlighting on."))
+     (t
+      (message "Run org-milestone-table-update-timeline first.")))))
 
 ;;;###autoload
 (with-eval-after-load 'org
