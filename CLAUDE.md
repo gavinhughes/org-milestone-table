@@ -32,6 +32,9 @@ BACKLOG.org                  # Future feature ideas
 EXAMPLE.org                  # Real-world usage example
 ```
 
+## Plan conventions
+- Include your expected commit message in the plan.
+
 ## Coding conventions
 
 - **Naming:** Public functions use `org-milestone-table-` prefix.
