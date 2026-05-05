@@ -9,7 +9,6 @@
 
 Error if not present.
 
-* Predecessor column name can be either Predecessor or Pred
 * fix: CI linting
 
 
@@ -95,6 +94,10 @@ Fuzzy IDs are explicitly excluded from the check.
 ** DONE Feature: Sort rows by date
 - New command: ~org-milestone-table-sort-by-date~
 - Sorts data rows ascending by Date column; dateless rows go to end.
+
+** DONE Column label can be "Pred", "Predecessors", or "Predecessor"
+*** commit
+625cd04 feat: accept "Predecessor" as an alias for the Pred column header
 
 ** DONE Column label can be "Pred" or "Predecessors"
 
