@@ -279,6 +279,20 @@ Point is placed at the beginning of the table."
       (should (< (string-match "Earlier" content)
                  (string-match "Later" content))))))
 
+(ert-deftest omt-test-sort-same-date-predecessor-first ()
+  "When two rows share a date, the predecessor sorts before its dependent."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone  |
+|----+------+------------+------------|
+| 2  | 1+0  | 2025-06-01 | Dependent  |
+| 1  |      | 2025-06-01 | Predecessor |
+"
+    (org-milestone-table-sort-by-date)
+    (goto-char (point-min))
+    (let ((content (buffer-string)))
+      (should (< (string-match "Predecessor" content)
+                 (string-match "Dependent" content))))))
+
 (ert-deftest omt-test-sort-by-date-no-date-last ()
   "Rows without dates sort to the end."
   (omt-test-with-table

@@ -1,5 +1,8 @@
 #+title: Changelog
 
+* <2026-05-05 Tue>
+- Bugfix: ~org-milestone-table-sort-by-date~ now places a row before its dependent when both share the same date.
+
 * <2026-04-16 Thu>
 - Feature: ~org-milestone-table-highlight-critical-path~ custom variable (default ~nil~) controls whether ~C-c C-c~ automatically highlights the critical path. Use ~org-milestone-table-toggle-critical-path~ to toggle independently at any time.
 - Feature: ~org-milestone-table-critical-path~ face now has explicit light/dark theme color specs (amber palette) instead of inheriting ~highlight~, making it straightforward to customize via ~M-x customize-face~.

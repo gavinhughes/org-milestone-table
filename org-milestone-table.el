@@ -657,14 +657,34 @@ is absent, they are placed before the trailing block of undated rows."
             (push r normal-rows)))
         (setq fuzzy-rows (nreverse fuzzy-rows))
         (setq normal-rows (nreverse normal-rows))
-        ;; Sort normal rows: dated ascending, undated last
-        (setq normal-rows
-              (sort normal-rows
-                    (lambda (a b)
-                      (cond
-                       ((and (nth 0 a) (nth 0 b)) (< (nth 0 a) (nth 0 b)))
-                       ((nth 0 a) t)
-                       (t nil)))))
+        ;; Build predecessor map for same-date tiebreaking.
+        ;; Maps id -> list of direct predecessor ids.
+        (let ((pred-map (make-hash-table :test 'equal)))
+          (dolist (r normal-rows)
+            (when (and (nth 1 r) (nth 2 r))
+              (puthash (nth 1 r) (omt--collect-pred-ids (nth 2 r)) pred-map)))
+          ;; Sort normal rows: dated ascending, undated last.
+          ;; Tiebreak equal dates by predecessor relationship (ancestor first).
+          (cl-labels ((ancestor-p (anc-id desc-id visited)
+                        (unless (gethash desc-id visited)
+                          (puthash desc-id t visited)
+                          (let ((preds (gethash desc-id pred-map)))
+                            (or (member anc-id preds)
+                                (cl-some (lambda (p)
+                                           (ancestor-p anc-id p visited))
+                                         preds))))))
+            (setq normal-rows
+                  (sort normal-rows
+                        (lambda (a b)
+                          (cond
+                           ((and (nth 0 a) (nth 0 b))
+                            (if (= (nth 0 a) (nth 0 b))
+                                (and (nth 1 a) (nth 1 b)
+                                     (ancestor-p (nth 1 a) (nth 1 b)
+                                                 (make-hash-table :test 'equal)))
+                              (< (nth 0 a) (nth 0 b))))
+                           ((nth 0 a) t)
+                           (t nil)))))))
         ;; Order undated rows: anchor those referenced by dated rows just before
         ;; their earliest dated dependent; topo-sort the rest at the end.
         (let* ((dated-rows     (cl-remove-if-not #'car normal-rows))
