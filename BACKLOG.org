@@ -1,7 +1,6 @@
 #+title: Backlog
 #+strartup: overview
 
-* fix: add-missing-ids: on undo, leave point in place
 * fix: C-c C-c: Leave point in place
 * Minimum required column names are
 - ID
@@ -47,6 +46,14 @@ org-milestone-table-update-timeline
 * Maybe
 ** Feature: Support for business-day offsets (skip weekends)
 * [X] Done
+** DONE fix: add-missing-ids: on undo, leave point in place
+*** commit da4a653
+=fix: add-missing-ids restores point on undo=
+
+Pushed the pre-command point onto =buffer-undo-list= inside a
+=with-undo-amalgamate= group, so a single =undo= reverts every inserted ID
+and leaves point exactly where the user invoked the command.
+
 ** DONE Feature: Highlight critical path in timeline
 ** DONE change: org-milestone-table-new omits Status column
 *** commit b41eec2
