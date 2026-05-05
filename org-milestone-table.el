@@ -97,9 +97,9 @@ Customize the background and foreground colors to suit your theme."
 (defun org-milestone-table-new ()
   "Insert an empty milestone table at point."
   (interactive)
-  (insert "| ID | Pred | Date | Status | Milestone |
-|----+------+------+--------+-----------|
-|    |      |      |        |           |
+  (insert "| ID | Pred | Date | Milestone |
+|----+------+------+-----------|
+|    |      |      |           |
 ")
   (forward-line -1)
   (org-table-goto-column 1)

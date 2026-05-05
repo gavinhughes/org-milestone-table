@@ -378,7 +378,7 @@ Point is placed at the beginning of the table."
     (org-milestone-table-new)
     (goto-char (point-min))
     (let ((content (buffer-string)))
-      (should (string-match-p "| ID | Pred | Date | Status | Milestone |" content))
+      (should (string-match-p "| ID | Pred | Date | Milestone |" content))
       (should (string-match-p "|----" content)))))
 
 (ert-deftest omt-test-update-duplicate-id-error ()
