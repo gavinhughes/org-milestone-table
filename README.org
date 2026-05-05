@@ -26,6 +26,13 @@ Clone this repository and add it to your =load-path=:
 (require 'org-milestone-table)
 #+end_src
 
+* Quick start
+
+The fastest path: insert a table with =M-x org-milestone-table-new=, fill
+in your milestones, then press =C-c C-c= anywhere inside the table.  That
+runs the full pipeline (add missing IDs, compute dates, sort by date)
+in one step.
+
 * Usage
 
 ** Insert an empty table
@@ -33,9 +40,9 @@ Clone this repository and add it to your =load-path=:
 =M-x org-milestone-table-new=
 
 #+begin_example
-| ID | Pred | Date | Status | Milestone |
-|----+------+------+--------+-----------|
-|    |      |      |        |           |
+| ID | Pred | Date | Milestone |
+|----+------+------+-----------|
+|    |      |      |           |
 #+end_example
 
 ** Fill in your milestones
@@ -50,53 +57,138 @@ Clone this repository and add it to your =load-path=:
 | 5  | 4+5d  |            | Launch           |
 #+end_example
 
-** Compute dates
+** =C-c C-c= — do everything
 
-=M-x org-milestone-table-update-timeline=
+With point inside any milestone table, =C-c C-c= runs
+=org-milestone-table-dwim=, which calls (in order):
 
-All rows with predecessor references will have their Date column filled in
-automatically.
+1. =org-milestone-table-add-missing-ids=
+2. =org-milestone-table-update-timeline=
+3. =org-milestone-table-sort-by-date=
 
-** Auto-number rows
+The hook is installed automatically when the package loads, so no
+configuration is needed.  Point is preserved across the operation.
 
-=M-x org-milestone-table-add-missing-ids=
+** Individual commands
 
-Rows without an ID get sequential numbers starting after the highest existing ID.
+If you prefer to invoke pieces individually:
 
-** Sort by date
+| Command                                       | What it does                              |
+|-----------------------------------------------+-------------------------------------------|
+| =org-milestone-table-new=                     | Insert an empty 4-column table            |
+| =org-milestone-table-update-timeline=         | Compute dates from predecessors           |
+| =org-milestone-table-add-missing-ids=         | Auto-number rows that lack an ID          |
+| =org-milestone-table-sort-by-date=            | Sort data rows by date ascending          |
+| =org-milestone-table-toggle-critical-path=    | Toggle critical-path highlighting         |
 
-=M-x org-milestone-table-sort-by-date=
+=org-milestone-table-add-missing-ids= supports a single =undo= that
+reverts every inserted ID at once and restores point to where you
+invoked the command.
 
-Reorders data rows by date ascending.  Rows without dates sort to the end.
+* Required columns
 
-* Predecessor Syntax
+A milestone table must contain three columns, identified by name in
+the header row (case-insensitive):
+
+- =ID=
+- =Pred= (also accepted: =Predecessor= or =Predecessors=)
+- =Date=
+
+Any other columns (=Milestone=, =Status=, =Notes=, etc.) are preserved
+untouched.  Column order does not matter.  If any required column is
+missing, commands raise =No ID column= / =No Pred column= /
+=No Date column=.
+
+* Predecessor syntax
 
 Predecessors are specified in the =Pred= column:
 
 | Syntax    | Meaning                              |
 |-----------+--------------------------------------|
-| =3+10d=  | 10 days after milestone 3            |
-| =3-2w=   | 2 weeks before milestone 3           |
-| =3+1m=   | 1 month after milestone 3            |
-| =5=      | Same date as milestone 5 (= =5+0d=) |
-| =1+5d,2= | Later of: 5 days after 1, date of 2 |
+| =3+10d=   | 10 days after milestone 3            |
+| =3-2w=    | 2 weeks before milestone 3           |
+| =3+1m=    | 1 month after milestone 3            |
+| =5=       | Same date as milestone 5 (= =5+0d=)  |
+| =1+5d,2=  | Later of: 5 days after 1, date of 2  |
 
 Supported units:
 - =d= — days
 - =w= — weeks (7 days)
 - =m= — months (calendar months, day clamped to month length)
 
-Multiple predecessors are separated by commas.  The *latest* (maximum) date
-wins.
+Multiple predecessors are separated by commas.  The *latest* (maximum)
+date wins.
 
-* Suggested Keybindings
+** Fuzzy / placeholder IDs
+
+An ID with a trailing =?= (e.g. =15?=) marks a milestone as a
+placeholder — its predecessors are not yet known.  Fuzzy rows:
+
+- are left undated by =update-timeline=,
+- are excluded from circular-reference detection, and
+- sort immediately before the row whose ID is the base number
+  (=15?= sorts next to =15=).
+
+** Sort behavior details
+
+=org-milestone-table-sort-by-date= sorts dated rows ascending by date.
+For undated rows:
+
+- An undated row referenced as a predecessor by a dated row is
+  spliced in just before the earliest such dependent.
+- Remaining undated rows are placed at the end, topologically sorted
+  so that predecessors precede their dependents.
+- When two rows share the same date, the predecessor sorts above its
+  dependent.
+
+* Critical path
+
+After =org-milestone-table-update-timeline= computes dates, the package
+identifies the critical path — the chain of dependencies leading to
+the latest finish.
+
+- =M-x org-milestone-table-toggle-critical-path= toggles a row
+  highlight on/off without recomputing dates.
+- Set the user option =org-milestone-table-highlight-critical-path= to
+  =t= to highlight automatically on every =C-c C-c=.
+- The face =org-milestone-table-critical-path= ships with light and
+  dark theme colors (amber palette).  Customize it with
+  =M-x customize-face=.
+
+* Validation and errors
+
+=update-timeline= reports problems in a dedicated
+=*Milestone Table Errors*= buffer (popped up at the bottom of the
+frame) rather than the minibuffer.  Detected problems:
+
+- duplicate milestone IDs,
+- circular predecessor references,
+- predecessors that reference an unknown ID,
+- malformed dates (anything other than =YYYY-MM-DD=),
+- malformed predecessor strings.
+
+When errors are present, the table is left untouched until you fix
+them.
+
+* Customization
+
+| User option                                       | Default | Effect                                                                  |
+|---------------------------------------------------+---------+-------------------------------------------------------------------------|
+| =org-milestone-table-highlight-critical-path=     | =nil=   | When =t=, =C-c C-c= highlights the critical path automatically          |
+
+| Face                                              | Used for                                  |
+|---------------------------------------------------+-------------------------------------------|
+| =org-milestone-table-critical-path=               | Critical-path row highlight overlay       |
+
+* Suggested keybindings
+
+The =C-c C-c= integration handles the common case automatically.  For
+the few commands that aren't part of the DWIM pipeline:
 
 #+begin_src elisp
 (with-eval-after-load 'org
-  (define-key org-mode-map (kbd "C-c m u") #'org-milestone-table-update-timeline)
-  (define-key org-mode-map (kbd "C-c m i") #'org-milestone-table-add-missing-ids)
-  (define-key org-mode-map (kbd "C-c m s") #'org-milestone-table-sort-by-date)
-  (define-key org-mode-map (kbd "C-c m n") #'org-milestone-table-new))
+  (define-key org-mode-map (kbd "C-c m n") #'org-milestone-table-new)
+  (define-key org-mode-map (kbd "C-c m c") #'org-milestone-table-toggle-critical-path))
 #+end_src
 
 * Contributing
