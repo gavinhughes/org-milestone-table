@@ -125,6 +125,7 @@ Customize the background and foreground colors to suit your theme."
                   (cond
                    ((string= name "id") (setq col-id i))
                    ((or (string= name "pred")
+                        (string= name "predecessor")
                         (string= name "predecessors")) (setq col-pred i))
                    ((string= name "date") (setq col-date i)))))
     (unless col-id (user-error "No ID column"))

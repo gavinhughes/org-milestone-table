@@ -161,6 +161,12 @@ Point is placed at the beginning of the table."
       (should (= (nth 2 hdr) 3))   ; col-pred
       (should (= (nth 3 hdr) 0))))) ; col-date
 
+(ert-deftest omt-test-parse-header-predecessor-alias ()
+  "Column header \"Predecessor\" is accepted as the pred column."
+  (omt-test-with-table "| ID | Predecessor | Date | Milestone |\n|----+-------------+------+-----------|\n"
+    (let ((hdr (omt--parse-header)))
+      (should (= (nth 2 hdr) 1)))))   ; col-pred
+
 (ert-deftest omt-test-parse-header-missing-id ()
   "Error when ID column is missing."
   (omt-test-with-table "| Pred | Date | Milestone |\n|------+------+-----------|\n"
