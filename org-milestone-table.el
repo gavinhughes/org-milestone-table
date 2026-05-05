@@ -482,6 +482,10 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
 Finds the maximum existing numeric ID and assigns incrementing IDs
 starting from max+1."
   (interactive)
+  (let ((orig-pt (point)))
+    (with-undo-amalgamate
+      (when (listp buffer-undo-list)
+        (push orig-pt buffer-undo-list))
   (save-excursion
     (unless (org-at-table-p)
       (user-error "Not in a table"))
@@ -551,7 +555,7 @@ starting from max+1."
               (cl-incf count)))))
         (goto-char (org-table-begin))
         (org-table-align)
-        (message "Added %d ID(s), starting from %d." count (1+ max-id))))))
+        (message "Added %d ID(s), starting from %d." count (1+ max-id))))))))
 
 (defun omt--topo-sort-undated (rows)
   "Sort undated ROWS so predecessors appear before their dependents.
