@@ -1,6 +1,7 @@
 #+title: Changelog
 
 * <2026-05-05 Tue>
+- Docs: Refresh README to document ~C-c C-c~ / ~org-milestone-table-dwim~, critical-path highlighting, fuzzy IDs, the validation error buffer, predecessor column aliases, and the required-columns rule. Fix the stale 5-column template example for ~org-milestone-table-new~.
 - Feature: The predecessor column now accepts ~Predecessor~ (singular) as an alias alongside ~Pred~ and ~Predecessors~.
 - Bugfix: ~org-milestone-table-add-missing-ids~ now atomically undoes all inserted IDs in a single ~undo~ and leaves point at the user's pre-command position.
 - Bugfix: ~org-milestone-table-sort-by-date~ now places a row before its dependent when both share the same date.
