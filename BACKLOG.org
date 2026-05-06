@@ -1,6 +1,11 @@
 #+title: Backlog
 #+strartup: overview
 
+* Bug: C-c sorts table with no IDs or Dates added, should only add IDs
+* Feature: Dates can be entered in M/D or M/D/Y, configurable to D/M
+- Convert to standard form on C-c C-c
+-
+* Feature: Duration
 * fix: C-c C-c: Leave point in place
 * Minimum required column names are
 - ID
@@ -45,6 +50,16 @@ org-milestone-table-update-timeline
 * Maybe
 ** Feature: Support for business-day offsets (skip weekends)
 * [X] Done
+** DONE Feature: Items with status Done are crossed out and can be hidden
+*** commit 712bf7d
+=feat: Status column with done strikethrough and hide-done toggle=
+
+Optional =Status= column.  Rows whose Status matches
+=org-milestone-table-done-statuses= (default =("done" "Done" "DONE")=,
+case-insensitive) get a strikethrough via the new
+=org-milestone-table-done= face.  =org-milestone-table-toggle-hide-done=
+folds those rows out of view.
+
 ** DONE fix: add-missing-ids: on undo, leave point in place
 *** commit da4a653
 =fix: add-missing-ids restores point on undo=

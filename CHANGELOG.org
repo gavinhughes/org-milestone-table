@@ -1,5 +1,9 @@
 #+title: Changelog
 
+* <2026-05-06 Wed>
+- Feature: Optional ~Status~ column.  Rows whose Status matches ~org-milestone-table-done-statuses~ (default ~("done" "Done" "DONE")~, compared case-insensitively) are rendered with a strikethrough via the new ~org-milestone-table-done~ face.
+- Feature: ~org-milestone-table-toggle-hide-done~ folds done rows out of view in the table.  The strikethrough indicates done state when not hidden.
+
 * <2026-05-05 Tue>
 - Docs: Refresh README to document ~C-c C-c~ / ~org-milestone-table-dwim~, critical-path highlighting, fuzzy IDs, the validation error buffer, predecessor column aliases, and the required-columns rule. Fix the stale 5-column template example for ~org-milestone-table-new~.
 - Feature: The predecessor column now accepts ~Predecessor~ (singular) as an alias alongside ~Pred~ and ~Predecessors~.
