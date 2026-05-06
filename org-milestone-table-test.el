@@ -670,5 +670,129 @@ Point is placed at the beginning of the table."
         ;; Second table also has its own overlays.
         (should (omt--current-table-overlays))))))
 
+;;; --- Status column / done overlays ---
+
+(ert-deftest omt-test-parse-header-status-optional ()
+  "Status column is optional; absent means col-status is nil."
+  (omt-test-with-table "| ID | Pred | Date | Milestone |\n|----+------+------+-----------|\n"
+    (let ((hdr (omt--parse-header)))
+      (should (null (nth 4 hdr))))))
+
+(ert-deftest omt-test-parse-header-status-recognized ()
+  "Status column index is returned (case-insensitive header match)."
+  (omt-test-with-table "| ID | Pred | Date | status | Milestone |\n|----+------+------+--------+-----------|\n"
+    (let ((hdr (omt--parse-header)))
+      (should (= (nth 4 hdr) 3)))))
+
+(ert-deftest omt-test-status-done-p-case-insensitive ()
+  "`omt--status-done-p' matches members of the defcustom case-insensitively."
+  (should (omt--status-done-p "done"))
+  (should (omt--status-done-p "Done"))
+  (should (omt--status-done-p "DONE"))
+  (should (omt--status-done-p "  done  "))
+  (should-not (omt--status-done-p "todo"))
+  (should-not (omt--status-done-p ""))
+  (should-not (omt--status-done-p nil)))
+
+(ert-deftest omt-test-status-done-p-respects-defcustom ()
+  "Adding a value to `org-milestone-table-done-statuses' makes it match."
+  (let ((org-milestone-table-done-statuses '("done" "cancelled")))
+    (should (omt--status-done-p "Cancelled"))
+    (should (omt--status-done-p "CANCELLED"))
+    (should-not (omt--status-done-p "wontfix"))))
+
+(ert-deftest omt-test-update-timeline-strikes-done-rows ()
+  "After update-timeline, Done rows carry an `org-milestone-table-done' overlay."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Status | Milestone |
+|----+------+------------+--------+-----------|
+| 1  |      | 2025-01-01 | Done   | Start     |
+| 2  | 1+5d |            |        | Next      |
+"
+    (org-milestone-table-update-timeline)
+    (let* ((entry (car omt--table-states))
+           (done-ovs (nth 3 entry)))
+      (should (= 1 (length done-ovs)))
+      (should (eq (overlay-get (car done-ovs) 'face)
+                  'org-milestone-table-done)))))
+
+(ert-deftest omt-test-update-timeline-no-overlay-on-non-done ()
+  "Non-Done rows get no done overlay."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Status | Milestone |
+|----+------+------------+--------+-----------|
+| 1  |      | 2025-01-01 | TODO   | Start     |
+"
+    (org-milestone-table-update-timeline)
+    (let ((entry (car omt--table-states)))
+      (should (null (nth 3 entry))))))
+
+(ert-deftest omt-test-update-timeline-no-status-column ()
+  "When the table has no Status column, no done overlays are created."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone |
+|----+------+------------+-----------|
+| 1  |      | 2025-01-01 | Start     |
+"
+    (org-milestone-table-update-timeline)
+    (let ((entry (car omt--table-states)))
+      (should (null (nth 3 entry))))))
+
+(ert-deftest omt-test-toggle-hide-done-roundtrip ()
+  "Toggle hides done rows; second toggle restores them."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Status | Milestone |
+|----+------+------------+--------+-----------|
+| 1  |      | 2025-01-01 | Done   | Start     |
+"
+    (org-milestone-table-update-timeline)
+    (org-milestone-table-toggle-hide-done)
+    (let* ((entry (car omt--table-states))
+           (ov (car (nth 3 entry))))
+      (should (overlay-get ov 'invisible)))
+    (org-milestone-table-toggle-hide-done)
+    (let* ((entry (car omt--table-states))
+           (ov (car (nth 3 entry))))
+      (should-not (overlay-get ov 'invisible)))))
+
+(ert-deftest omt-test-toggle-hide-done-no-status-column ()
+  "Toggle errors gracefully when there is no Status column."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Milestone |
+|----+------+------------+-----------|
+| 1  |      | 2025-01-01 | Start     |
+"
+    (should-error (org-milestone-table-toggle-hide-done) :type 'user-error)))
+
+(ert-deftest omt-test-dwim-restrikes-done-after-sort ()
+  "Done overlays survive the sort step inside C-c C-c."
+  (omt-test-with-table
+      "| ID | Pred  | Date       | Status | Milestone |
+|----+-------+------------+--------+-----------|
+| 2  | 1+5d  |            |        | Next      |
+| 1  |       | 2025-01-01 | Done   | Start     |
+"
+    (org-milestone-table-dwim)
+    (let* ((entry (car omt--table-states))
+           (done-ovs (nth 3 entry)))
+      (should (= 1 (length done-ovs)))
+      (let* ((ov (car done-ovs))
+             (text (buffer-substring-no-properties (overlay-start ov)
+                                                   (overlay-end ov))))
+        (should (string-match-p "Start" text))))))
+
+(ert-deftest omt-test-status-defcustom-extension ()
+  "Adding \"cancelled\" to the defcustom causes Cancelled rows to be struck."
+  (let ((org-milestone-table-done-statuses '("done" "cancelled")))
+    (omt-test-with-table
+        "| ID | Pred | Date       | Status    | Milestone |
+|----+------+------------+-----------+-----------|
+| 1  |      | 2025-01-01 | Cancelled | Start     |
+"
+      (org-milestone-table-update-timeline)
+      (let* ((entry (car omt--table-states))
+             (done-ovs (nth 3 entry)))
+        (should (= 1 (length done-ovs)))))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here

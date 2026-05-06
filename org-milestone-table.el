@@ -78,16 +78,38 @@ The critical path can always be toggled manually with
 Customize the background and foreground colors to suit your theme."
   :group 'org-milestone-table)
 
+(defcustom org-milestone-table-done-statuses '("done" "Done" "DONE")
+  "Status values that mark a milestone as done.
+Rows whose Status column matches any string in this list (compared
+case-insensitively) are rendered with `org-milestone-table-done' and
+hidden by `org-milestone-table-toggle-hide-done'."
+  :type '(repeat string)
+  :group 'org-milestone-table)
+
+(defface org-milestone-table-done
+  '((t :strike-through t))
+  "Face used for rows whose Status column is a done value."
+  :group 'org-milestone-table)
+
 (defvar-local omt--table-states nil
-  "Alist of (TABLE-BEG-MARKER OVERLAYS CRITICAL-IDS) per table in buffer.")
+  "Per-table state.
+Each entry is (TABLE-BEG-MARKER CRITICAL-OVS CRITICAL-IDS DONE-OVS HIDE-DONE-P).")
 
 (defun omt--table-state (table-beg)
   "Return or create the state list for TABLE-BEG in `omt--table-states'."
   (or (cl-find-if (lambda (e) (= (marker-position (car e)) table-beg))
                   omt--table-states)
-      (let ((entry (list (copy-marker table-beg) nil nil)))
+      (let ((entry (list (copy-marker table-beg) nil nil nil nil)))
         (push entry omt--table-states)
         entry)))
+
+(defsubst omt--state-done-ovs (entry)
+  "Return the done-row overlays slot of state ENTRY."
+  (nth 3 entry))
+
+(defsubst omt--state-hide-done-p (entry)
+  "Return the hide-done flag slot of state ENTRY."
+  (nth 4 entry))
 
 (defun omt--current-table-overlays ()
   "Return critical-path overlays for the table at point."
@@ -111,14 +133,17 @@ Customize the background and foreground colors to suit your theme."
   (mapcar #'string-trim (split-string pred "," t "[ \t]+")))
 
 (defun omt--parse-header ()
-  "Parse header row at point.  Return (ncols col-id col-pred col-date)."
+  "Parse header row at point.
+Return (ncols col-id col-pred col-date col-status).
+COL-STATUS is nil when no Status column is present."
   (let* ((line (buffer-substring-no-properties
                 (line-beginning-position) (line-end-position)))
          (cells (omt--row-cells line))
          (ncols (length cells))
          (col-id nil)
          (col-pred nil)
-         (col-date nil))
+         (col-date nil)
+         (col-status nil))
     (cl-loop for cell in cells
              for i from 0
              do (let ((name (downcase (string-trim cell))))
@@ -127,11 +152,12 @@ Customize the background and foreground colors to suit your theme."
                    ((or (string= name "pred")
                         (string= name "predecessor")
                         (string= name "predecessors")) (setq col-pred i))
-                   ((string= name "date") (setq col-date i)))))
+                   ((string= name "date") (setq col-date i))
+                   ((string= name "status") (setq col-status i)))))
     (unless col-id (user-error "No ID column"))
     (unless col-pred (user-error "No Pred column"))
     (unless col-date (user-error "No Date column"))
-    (list ncols col-id col-pred col-date)))
+    (list ncols col-id col-pred col-date col-status)))
 
 (defun omt--row-cells (line)
   "Split table LINE into cell strings, preserving empty cells.
@@ -333,14 +359,49 @@ CRITICAL is a hash set of IDs.  ID-TO-ROW maps ID -> row plist."
                      (push ov (cadr entry))))))
              critical)))
 
+(defun omt--status-done-p (status)
+  "Return non-nil if STATUS matches `org-milestone-table-done-statuses'.
+Comparison is case-insensitive."
+  (and status
+       (let ((s (downcase (string-trim status))))
+         (cl-some (lambda (d) (string= s (downcase d)))
+                  org-milestone-table-done-statuses))))
+
+(defun omt--apply-done-overlays (id-to-row col-status)
+  "Add a strikethrough overlay to each row in ID-TO-ROW with a done status.
+COL-STATUS is the Status column index, or nil if no Status column.
+Replaces any existing done overlays for the current table.  When the
+table state's hide-done flag is set, also marks each overlay invisible."
+  (let* ((entry (omt--table-state (org-table-begin)))
+         (hide-p (omt--state-hide-done-p entry)))
+    (mapc #'delete-overlay (omt--state-done-ovs entry))
+    (setf (nth 3 entry) nil)
+    (when col-status
+      (maphash
+       (lambda (_id row)
+         (let ((status (plist-get row :status))
+               (lb     (plist-get row :line-beg)))
+           (when (and lb (omt--status-done-p status))
+             (let* ((le (save-excursion
+                          (goto-char lb)
+                          (line-end-position)))
+                    (ov (make-overlay lb le)))
+               (overlay-put ov 'face 'org-milestone-table-done)
+               (overlay-put ov 'org-milestone-table-done t)
+               (when hide-p (overlay-put ov 'invisible t))
+               (push ov (nth 3 entry))))))
+       id-to-row))))
+
 (defun omt--reparse-id-positions ()
-  "Return a fresh hash table mapping ID -> minimal plist with :id and :line-beg.
+  "Return a fresh hash table mapping ID -> plist with :id, :line-beg, :status.
+The :status key is included only when a Status column is present.
 Used to reapply overlays after the table rows have been reordered."
   (save-excursion
     (goto-char (org-table-begin))
     (let* ((hdr (omt--parse-header))
-           (ncols (car hdr))
-           (col-id (cadr hdr))
+           (ncols (nth 0 hdr))
+           (col-id (nth 1 hdr))
+           (col-status (nth 4 hdr))
            (result (make-hash-table :test 'equal)))
       (forward-line 1)
       (while (and (looking-at "^[ \t]*|") (looking-at "^[ \t]*|[-+]"))
@@ -350,9 +411,15 @@ Used to reapply overlays after the table rows have been reordered."
                (ln (buffer-substring-no-properties lb (line-end-position)))
                (cs (omt--row-cells ln)))
           (when (>= (length cs) ncols)
-            (let ((id (string-trim (nth col-id cs))))
+            (let ((id (string-trim (nth col-id cs)))
+                  (status (when col-status
+                            (string-trim (nth col-status cs)))))
               (unless (string-empty-p id)
-                (puthash id (list :id id :line-beg lb) result)))))
+                (puthash id
+                         (if col-status
+                             (list :id id :line-beg lb :status status)
+                           (list :id id :line-beg lb))
+                         result)))))
         (forward-line 1))
       result)))
 
@@ -362,6 +429,15 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
   (let ((critical-ids (caddr (omt--table-state (org-table-begin)))))
     (when critical-ids
       (omt--apply-critical-overlays critical-ids (omt--reparse-id-positions)))))
+
+(defun omt--refresh-done-overlays ()
+  "Reapply done-row overlays using the current buffer positions."
+  (save-excursion
+    (goto-char (org-table-begin))
+    (let* ((hdr (omt--parse-header))
+           (col-status (nth 4 hdr)))
+      (when col-status
+        (omt--apply-done-overlays (omt--reparse-id-positions) col-status)))))
 
 (defun omt--display-errors (errors)
   "Display ERRORS in a dedicated read-only buffer and pop it up."
@@ -392,6 +468,7 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
            (col-id (car (cdr hdr)))
            (col-pred (car (cdr (cdr hdr))))
            (col-date (car (cdr (cdr (cdr hdr)))))
+           (col-status (nth 4 hdr))
            (rows nil)
            (id-to-row (make-hash-table :test 'equal))
            (omt--errors nil)
@@ -411,10 +488,13 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
             (let* ((ids (string-trim (nth col-id cs)))
                    (pds (string-trim (nth col-pred cs)))
                    (dts (string-trim (nth col-date cs)))
+                   (sts (when col-status
+                          (string-trim (nth col-status cs))))
                    (r (list :line-beg lb
                             :id (unless (string-empty-p ids) ids)
                             :pred (unless (string-empty-p pds) pds)
-                            :date (unless (string-empty-p dts) dts))))
+                            :date (unless (string-empty-p dts) dts)
+                            :status sts)))
               (push r rows)
               (when (plist-get r :id)
                 (if (gethash (plist-get r :id) id-to-row)
@@ -475,6 +555,7 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
             (setcar (cddr (omt--table-state (org-table-begin))) cp)
             (when org-milestone-table-highlight-critical-path
               (omt--apply-critical-overlays cp id-to-row)))
+          (omt--apply-done-overlays id-to-row col-status)
           (message "Updated %d date(s)." (length updates)))))))
 
 ;;;###autoload
@@ -773,6 +854,7 @@ Intended for use on `org-ctrl-c-ctrl-c-hook'."
       (org-milestone-table-update-timeline)
       (org-milestone-table-sort-by-date)
       (omt--refresh-critical-overlays)
+      (omt--refresh-done-overlays)
       (goto-char (org-table-begin))
       (forward-line row-offset)
       (when (org-at-table-p)
@@ -796,6 +878,24 @@ Always runs `org-milestone-table-update-timeline' first."
       (unless (cadr entry)
         (omt--refresh-critical-overlays))
       (message "Critical path highlighting on."))))
+
+;;;###autoload
+(defun org-milestone-table-toggle-hide-done ()
+  "Toggle visibility of rows whose Status is a done value.
+The strikethrough on done rows remains visible either way; this command
+only flips whether those rows are folded out of view."
+  (interactive)
+  (unless (org-at-table-p) (user-error "Not in a table"))
+  (save-excursion
+    (goto-char (org-table-begin))
+    (let* ((hdr (omt--parse-header))
+           (col-status (nth 4 hdr)))
+      (unless col-status (user-error "No Status column"))
+      (let* ((entry (omt--table-state (org-table-begin)))
+             (new (not (omt--state-hide-done-p entry))))
+        (setf (nth 4 entry) new)
+        (omt--refresh-done-overlays)
+        (message "Hide done rows: %s" (if new "on" "off"))))))
 
 ;;;###autoload
 (with-eval-after-load 'org

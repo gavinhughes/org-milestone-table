@@ -80,6 +80,7 @@ If you prefer to invoke pieces individually:
 | =org-milestone-table-add-missing-ids=         | Auto-number rows that lack an ID          |
 | =org-milestone-table-sort-by-date=            | Sort data rows by date ascending          |
 | =org-milestone-table-toggle-critical-path=    | Toggle critical-path highlighting         |
+| =org-milestone-table-toggle-hide-done=        | Hide/show rows whose Status is done       |
 
 =org-milestone-table-add-missing-ids= supports a single =undo= that
 reverts every inserted ID at once and restores point to where you
@@ -94,10 +95,11 @@ the header row (case-insensitive):
 - =Pred= (also accepted: =Predecessor= or =Predecessors=)
 - =Date=
 
-Any other columns (=Milestone=, =Status=, =Notes=, etc.) are preserved
-untouched.  Column order does not matter.  If any required column is
-missing, commands raise =No ID column= / =No Pred column= /
-=No Date column=.
+An optional =Status= column is also recognized — see
+[[*Status column][Status column]] below.  Any other columns
+(=Milestone=, =Notes=, etc.) are preserved untouched.  Column order
+does not matter.  If any required column is missing, commands raise
+=No ID column= / =No Pred column= / =No Date column=.
 
 * Predecessor syntax
 
@@ -155,6 +157,31 @@ the latest finish.
   dark theme colors (amber palette).  Customize it with
   =M-x customize-face=.
 
+* Status column
+
+If your table has a =Status= column, =update-timeline= renders rows
+whose status matches a "done" value with a strikethrough.  =Done=
+rows still participate normally in date computation; the strikethrough
+is purely visual.
+
+#+begin_example
+| ID | Pred  | Date       | Status | Milestone        |
+|----+-------+------------+--------+------------------|
+| 1  |       | 2025-01-01 | Done   | Project start    |
+| 2  | 1+14d | 2025-01-15 |        | Design complete  |
+#+end_example
+
+- =M-x org-milestone-table-toggle-hide-done= folds done rows out of
+  view in the table.  The toggle is per-table.  Run it again to bring
+  them back.
+- The recognized "done" values are configurable via
+  =org-milestone-table-done-statuses= (default =("done" "Done"
+  "DONE")=, compared case-insensitively).  Add =cancelled=,
+  =wontfix=, etc. to the list to extend the strikethrough/hide
+  behavior.
+- The face =org-milestone-table-done= controls the strikethrough
+  appearance.
+
 * Validation and errors
 
 =update-timeline= reports problems in a dedicated
@@ -172,13 +199,15 @@ them.
 
 * Customization
 
-| User option                                       | Default | Effect                                                                  |
-|---------------------------------------------------+---------+-------------------------------------------------------------------------|
-| =org-milestone-table-highlight-critical-path=     | =nil=   | When =t=, =C-c C-c= highlights the critical path automatically          |
+| User option                                       | Default                  | Effect                                                                  |
+|---------------------------------------------------+--------------------------+-------------------------------------------------------------------------|
+| =org-milestone-table-highlight-critical-path=     | =nil=                    | When =t=, =C-c C-c= highlights the critical path automatically          |
+| =org-milestone-table-done-statuses=               | =("done" "Done" "DONE")= | Status values that trigger strikethrough and =toggle-hide-done=         |
 
 | Face                                              | Used for                                  |
 |---------------------------------------------------+-------------------------------------------|
 | =org-milestone-table-critical-path=               | Critical-path row highlight overlay       |
+| =org-milestone-table-done=                        | Strikethrough on done-status rows         |
 
 * Suggested keybindings
 
@@ -188,7 +217,8 @@ the few commands that aren't part of the DWIM pipeline:
 #+begin_src elisp
 (with-eval-after-load 'org
   (define-key org-mode-map (kbd "C-c m n") #'org-milestone-table-new)
-  (define-key org-mode-map (kbd "C-c m c") #'org-milestone-table-toggle-critical-path))
+  (define-key org-mode-map (kbd "C-c m c") #'org-milestone-table-toggle-critical-path)
+  (define-key org-mode-map (kbd "C-c m h") #'org-milestone-table-toggle-hide-done))
 #+end_src
 
 * Contributing
