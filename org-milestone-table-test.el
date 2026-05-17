@@ -684,6 +684,18 @@ Point is placed at the beginning of the table."
     (let ((hdr (omt--parse-header)))
       (should (= (nth 4 hdr) 3)))))
 
+(ert-deftest omt-test-parse-header-milestone-recognized ()
+  "Milestone column index is returned (case-insensitive header match)."
+  (omt-test-with-table "| ID | Pred | Date | Status | milestone |\n|----+------+------+--------+-----------|\n"
+    (let ((hdr (omt--parse-header)))
+      (should (= (nth 5 hdr) 4)))))
+
+(ert-deftest omt-test-parse-header-milestone-absent ()
+  "When no Milestone column is present, col-milestone is nil."
+  (omt-test-with-table "| ID | Pred | Date | Status | Notes |\n|----+------+------+--------+-------|\n"
+    (let ((hdr (omt--parse-header)))
+      (should (null (nth 5 hdr))))))
+
 (ert-deftest omt-test-status-done-p-case-insensitive ()
   "`omt--status-done-p' matches members of the defcustom case-insensitively."
   (should (omt--status-done-p "done"))
@@ -702,7 +714,8 @@ Point is placed at the beginning of the table."
     (should-not (omt--status-done-p "wontfix"))))
 
 (ert-deftest omt-test-update-timeline-strikes-done-rows ()
-  "After update-timeline, Done rows carry an `org-milestone-table-done' overlay."
+  "After update-timeline, Done rows carry an `org-milestone-table-done' overlay
+spanning only the trimmed Milestone cell."
   (omt-test-with-table
       "| ID | Pred | Date       | Status | Milestone |
 |----+------+------------+--------+-----------|
@@ -713,8 +726,11 @@ Point is placed at the beginning of the table."
     (let* ((entry (car omt--table-states))
            (done-ovs (nth 3 entry)))
       (should (= 1 (length done-ovs)))
-      (should (eq (overlay-get (car done-ovs) 'face)
-                  'org-milestone-table-done)))))
+      (let ((ov (car done-ovs)))
+        (should (eq (overlay-get ov 'face) 'org-milestone-table-done))
+        (should (string= "Start"
+                         (buffer-substring-no-properties
+                          (overlay-start ov) (overlay-end ov))))))))
 
 (ert-deftest omt-test-update-timeline-no-overlay-on-non-done ()
   "Non-Done rows get no done overlay."
@@ -739,7 +755,8 @@ Point is placed at the beginning of the table."
       (should (null (nth 3 entry))))))
 
 (ert-deftest omt-test-toggle-hide-done-roundtrip ()
-  "Toggle hides done rows; second toggle restores them."
+  "Toggle hides done rows via a separate overlay; second toggle restores them.
+Throughout, the strike overlay on the Milestone cell remains present."
   (omt-test-with-table
       "| ID | Pred | Date       | Status | Milestone |
 |----+------+------------+--------+-----------|
@@ -748,12 +765,22 @@ Point is placed at the beginning of the table."
     (org-milestone-table-update-timeline)
     (org-milestone-table-toggle-hide-done)
     (let* ((entry (car omt--table-states))
-           (ov (car (nth 3 entry))))
-      (should (overlay-get ov 'invisible)))
+           (ovs (nth 3 entry))
+           (hide (cl-find-if (lambda (o) (overlay-get o 'invisible)) ovs))
+           (strike (cl-find-if (lambda (o)
+                                 (eq (overlay-get o 'face)
+                                     'org-milestone-table-done))
+                               ovs)))
+      (should (= 2 (length ovs)))
+      (should hide)
+      (should strike)
+      (should-not (overlay-get strike 'invisible)))
     (org-milestone-table-toggle-hide-done)
     (let* ((entry (car omt--table-states))
-           (ov (car (nth 3 entry))))
-      (should-not (overlay-get ov 'invisible)))))
+           (ovs (nth 3 entry)))
+      (should (= 1 (length ovs)))
+      (should (eq (overlay-get (car ovs) 'face) 'org-milestone-table-done))
+      (should-not (overlay-get (car ovs) 'invisible)))))
 
 (ert-deftest omt-test-toggle-hide-done-no-status-column ()
   "Toggle errors gracefully when there is no Status column."
@@ -779,7 +806,42 @@ Point is placed at the beginning of the table."
       (let* ((ov (car done-ovs))
              (text (buffer-substring-no-properties (overlay-start ov)
                                                    (overlay-end ov))))
-        (should (string-match-p "Start" text))))))
+        (should (string= "Start" text))))))
+
+(ert-deftest omt-test-strike-spans-only-milestone-cell ()
+  "The strike overlay covers only the trimmed Milestone cell, not the row."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Status | Milestone | Notes |
+|----+------+------------+--------+-----------+-------|
+| 1  |      | 2025-01-01 | Done   | Start     | note  |
+"
+    (org-milestone-table-update-timeline)
+    (let* ((entry (car omt--table-states))
+           (ov (car (nth 3 entry)))
+           (text (buffer-substring-no-properties
+                  (overlay-start ov) (overlay-end ov))))
+      (should (string= "Start" text))
+      (should-not (string-match-p "|" text))
+      (should-not (string-match-p "note" text)))))
+
+(ert-deftest omt-test-strike-skipped-when-no-milestone-column ()
+  "Done rows in a table with no Milestone column get no strike overlay,
+but hide-done still creates a full-row invisibility overlay."
+  (omt-test-with-table
+      "| ID | Pred | Date       | Status | Foo   |
+|----+------+------------+--------+-------|
+| 1  |      | 2025-01-01 | Done   | thing |
+"
+    (org-milestone-table-update-timeline)
+    (let ((entry (car omt--table-states)))
+      (should (null (nth 3 entry))))
+    (org-milestone-table-toggle-hide-done)
+    (let* ((entry (car omt--table-states))
+           (ovs (nth 3 entry)))
+      (should (= 1 (length ovs)))
+      (should (overlay-get (car ovs) 'invisible))
+      (should-not (eq (overlay-get (car ovs) 'face)
+                      'org-milestone-table-done)))))
 
 (ert-deftest omt-test-status-defcustom-extension ()
   "Adding \"cancelled\" to the defcustom causes Cancelled rows to be struck."
