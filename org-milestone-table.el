@@ -185,6 +185,21 @@ Each cell is trimmed of whitespace."
           (string-to-number (match-string 3 s))
           (string-to-number (match-string 1 s)))))
 
+(defun omt--parse-date-cell (s)
+  "Parse Date cell S into a plist.
+Returns (:fixed BOOL :date STR-OR-NIL :raw S).
+:fixed is non-nil when S contains the marker `F' anywhere.
+:date is the trimmed remainder with `F' removed (or nil if empty).
+Date validity is not checked here; pass :date to `omt--parse-date'."
+  (let* ((raw (or s ""))
+         (fixed (and (stringp raw) (string-match-p "F" raw)))
+         (stripped (if fixed
+                       (string-trim (replace-regexp-in-string "F" "" raw))
+                     (string-trim raw))))
+    (list :fixed (and fixed t)
+          :date (unless (string-empty-p stripped) stripped)
+          :raw raw)))
+
 (defun omt--format-date (greg)
   "Format gregorian (month day year) as YYYY-MM-DD."
   (let ((mm (car greg))
@@ -236,7 +251,8 @@ VISITED is list of IDs seen so far for cycle detection."
   (cl-block omt--resolve
     (let ((id (plist-get row :id))
           (pred (plist-get row :pred))
-          (date (plist-get row :date)))
+          (date (plist-get row :date))
+          (fixed (plist-get row :fixed)))
       ;; Cycle check — fuzzy IDs are soft placeholders and do not
       ;; participate in the dependency graph, so skip them here.
       (when (and id (not (omt--fuzzy-id-p id)) (member id visited))
@@ -279,9 +295,30 @@ VISITED is list of IDs seen so far for cycle detection."
                         (when rabs
                           (push (omt--apply-offset rabs op n unit)
                                 dates))))))))
-            (if (or failed (null dates))
-                nil
-              (apply #'max dates)))))))))
+            (cond
+             ((or failed (null dates)) nil)
+             ;; Fixed date with predecessors: must be >= predecessor-derived.
+             (fixed
+              (let ((pred-abs (apply #'max dates))
+                    (pd (omt--parse-date date)))
+                (cond
+                 ((null pd)
+                  (push (format "Bad date: %s" (or date ""))
+                        (symbol-value errs-sym))
+                  nil)
+                 (t
+                  (let ((fixed-abs (calendar-absolute-from-gregorian pd)))
+                    (if (< fixed-abs pred-abs)
+                        (progn
+                          (push (format
+                                 "Fixed date %s for ID %s conflicts with predecessors (earliest %s)"
+                                 date (or id "?")
+                                 (omt--format-date
+                                  (calendar-gregorian-from-absolute pred-abs)))
+                                (symbol-value errs-sym))
+                          nil)
+                      fixed-abs))))))
+             (t (apply #'max dates))))))))))
 
 (defun omt--collect-pred-ids (pred)
   "Return list of milestone ID strings referenced in PRED."
@@ -527,12 +564,14 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
             (let* ((ids (string-trim (nth col-id cs)))
                    (pds (string-trim (nth col-pred cs)))
                    (dts (string-trim (nth col-date cs)))
+                   (dc (omt--parse-date-cell dts))
                    (sts (when col-status
                           (string-trim (nth col-status cs))))
                    (r (list :line-beg lb
                             :id (unless (string-empty-p ids) ids)
                             :pred (unless (string-empty-p pds) pds)
-                            :date (unless (string-empty-p dts) dts)
+                            :date (plist-get dc :date)
+                            :fixed (plist-get dc :fixed)
                             :status sts)))
               (push r rows)
               (when (plist-get r :id)
@@ -551,7 +590,8 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
               (when (and (plist-get r :id)
                          (not (omt--fuzzy-id-p (plist-get r :id))))
                 (puthash (plist-get r :id) a id-to-abs))
-              (when (plist-get r :pred)
+              (when (and (plist-get r :pred)
+                         (not (plist-get r :fixed)))
                 (push (cons (plist-get r :line-beg)
                             (omt--format-date
                              (calendar-gregorian-from-absolute a)))

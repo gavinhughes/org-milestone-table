@@ -856,5 +856,135 @@ but hide-done still creates a full-row invisibility overlay."
              (done-ovs (nth 3 entry)))
         (should (= 1 (length done-ovs)))))))
 
+;;; --- Fixed dates (F marker) ---
+
+(ert-deftest omt-test-parse-date-cell-bare ()
+  "Bare date returns :fixed nil and the date unchanged."
+  (let ((p (omt--parse-date-cell "2025-01-10")))
+    (should (null (plist-get p :fixed)))
+    (should (equal (plist-get p :date) "2025-01-10"))))
+
+(ert-deftest omt-test-parse-date-cell-fixed-prefix ()
+  "F as prefix marks fixed and strips to bare date."
+  (let ((p (omt--parse-date-cell "F2025-01-10")))
+    (should (plist-get p :fixed))
+    (should (equal (plist-get p :date) "2025-01-10"))))
+
+(ert-deftest omt-test-parse-date-cell-fixed-space ()
+  "F followed by space marks fixed and strips to bare date."
+  (let ((p (omt--parse-date-cell "F 2025-01-10")))
+    (should (plist-get p :fixed))
+    (should (equal (plist-get p :date) "2025-01-10"))))
+
+(ert-deftest omt-test-parse-date-cell-fixed-suffix ()
+  "F as suffix also marks fixed."
+  (let ((p (omt--parse-date-cell "2025-01-10 F")))
+    (should (plist-get p :fixed))
+    (should (equal (plist-get p :date) "2025-01-10"))))
+
+(ert-deftest omt-test-parse-date-cell-empty ()
+  "Empty cell yields :date nil and :fixed nil."
+  (let ((p (omt--parse-date-cell "")))
+    (should (null (plist-get p :fixed)))
+    (should (null (plist-get p :date)))))
+
+(ert-deftest omt-test-resolve-fixed-no-pred ()
+  "Fixed date with no predecessor resolves to the literal date."
+  (let ((tbl (make-hash-table :test 'equal))
+        (errors nil)
+        (row (list :id "1" :pred nil :date "2025-03-15" :fixed t)))
+    (puthash "1" row tbl)
+    (let ((result (omt--resolve row tbl 'errors nil)))
+      (should (= result (calendar-absolute-from-gregorian '(3 15 2025))))
+      (should (null errors)))))
+
+(ert-deftest omt-test-resolve-fixed-with-pred-later ()
+  "Fixed date later than predecessor uses the fixed date."
+  (let ((tbl (make-hash-table :test 'equal))
+        (errors nil)
+        (r1 (list :id "1" :pred nil :date "2025-01-01"))
+        (r2 (list :id "2" :pred "1+5d" :date "2025-02-01" :fixed t)))
+    (puthash "1" r1 tbl)
+    (puthash "2" r2 tbl)
+    (let* ((result (omt--resolve r2 tbl 'errors nil))
+           (greg (calendar-gregorian-from-absolute result)))
+      (should (equal greg '(2 1 2025)))
+      (should (null errors)))))
+
+(ert-deftest omt-test-resolve-fixed-with-pred-equal ()
+  "Fixed date equal to predecessor-derived date uses the fixed date."
+  (let ((tbl (make-hash-table :test 'equal))
+        (errors nil)
+        (r1 (list :id "1" :pred nil :date "2025-01-01"))
+        (r2 (list :id "2" :pred "1+5d" :date "2025-01-06" :fixed t)))
+    (puthash "1" r1 tbl)
+    (puthash "2" r2 tbl)
+    (let* ((result (omt--resolve r2 tbl 'errors nil))
+           (greg (calendar-gregorian-from-absolute result)))
+      (should (equal greg '(1 6 2025)))
+      (should (null errors)))))
+
+(ert-deftest omt-test-resolve-fixed-with-pred-earlier ()
+  "Fixed date earlier than predecessor-derived date is a conflict."
+  (let ((tbl (make-hash-table :test 'equal))
+        (r1 (list :id "1" :pred nil :date "2025-01-01"))
+        (r2 (list :id "2" :pred "1+10d" :date "2025-01-05" :fixed t)))
+    (puthash "1" r1 tbl)
+    (puthash "2" r2 tbl)
+    (defvar omt--test-fixed-errors nil)
+    (setq omt--test-fixed-errors nil)
+    (let ((result (omt--resolve r2 tbl 'omt--test-fixed-errors nil)))
+      (should (null result))
+      (should (cl-some (lambda (e) (string-match-p "conflicts with predecessors" e))
+                       omt--test-fixed-errors)))))
+
+(ert-deftest omt-test-resolve-fixed-bad-date ()
+  "Fixed marker with unparseable date yields a Bad date error."
+  (let ((tbl (make-hash-table :test 'equal))
+        (r1 (list :id "1" :pred nil :date "2025-01-01"))
+        (r2 (list :id "2" :pred "1+0d" :date "blah" :fixed t)))
+    (puthash "1" r1 tbl)
+    (puthash "2" r2 tbl)
+    (defvar omt--test-fixed-bad-errors nil)
+    (setq omt--test-fixed-bad-errors nil)
+    (let ((result (omt--resolve r2 tbl 'omt--test-fixed-bad-errors nil)))
+      (should (null result))
+      (should (cl-some (lambda (e) (string-match-p "Bad date" e))
+                       omt--test-fixed-bad-errors)))))
+
+(ert-deftest omt-test-update-timeline-fixed-preserves-cell ()
+  "Fixed cell text is preserved; downstream rows use the fixed anchor."
+  (omt-test-with-table
+      "| ID | Pred  | Date        | Milestone |
+|----+-------+-------------+-----------|
+| 1  |       | 2025-01-01  | Start     |
+| 2  | 1+5d  | F2025-02-01 | Pinned    |
+| 3  | 2+3d  |             | After     |
+"
+    (org-milestone-table-update-timeline)
+    (goto-char (point-min))
+    ;; Fixed cell preserved verbatim.
+    (should (search-forward "F2025-02-01" nil t))
+    ;; Downstream row computed from the fixed anchor (2025-02-01 + 3d).
+    (goto-char (point-min))
+    (should (search-forward "2025-02-04" nil t))))
+
+(ert-deftest omt-test-update-timeline-fixed-conflict-errors ()
+  "Fixed date earlier than predecessor-derived surfaces in errors buffer."
+  (when (get-buffer "*Milestone Table Errors*")
+    (kill-buffer "*Milestone Table Errors*"))
+  (omt-test-with-table
+      "| ID | Pred   | Date        | Milestone |
+|----+--------+-------------+-----------|
+| 1  |        | 2025-01-01  | Start     |
+| 2  | 1+10d  | F2025-01-05 | Too early |
+"
+    (org-milestone-table-update-timeline)
+    (let ((buf (get-buffer "*Milestone Table Errors*")))
+      (should buf)
+      (with-current-buffer buf
+        (should (string-match-p "conflicts with predecessors"
+                                (buffer-string)))))))
+
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here
