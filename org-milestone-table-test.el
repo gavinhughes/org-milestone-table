@@ -61,6 +61,72 @@ Point is placed at the beginning of the table."
   "Return nil for partial date."
   (should (null (omt--parse-date "2025-03"))))
 
+;;; --- omt--expand-shorthand-date ---
+
+(ert-deftest omt-test-expand-shorthand-mdy-full ()
+  "M/D/YYYY expands to canonical ISO with style mdy."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (should (equal (omt--expand-shorthand-date "5/17/2026") "2026-05-17"))))
+
+(ert-deftest omt-test-expand-shorthand-mdy-two-digit-year ()
+  "Two-digit year maps to 2000+YY."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (should (equal (omt--expand-shorthand-date "5/17/26") "2026-05-17"))))
+
+(ert-deftest omt-test-expand-shorthand-mdy-zero-pad ()
+  "Single-digit month and day are zero-padded in the canonical form."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (should (equal (omt--expand-shorthand-date "1/5/2026") "2026-01-05"))))
+
+(ert-deftest omt-test-expand-shorthand-mdy-bare-future ()
+  "Bare M/D uses current year when the date is today or later."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (cl-letf (((symbol-function 'decode-time)
+               (lambda (&rest _) '(0 0 0 1 6 2026 0 nil 0))))
+      (should (equal (omt--expand-shorthand-date "8/15") "2026-08-15")))))
+
+(ert-deftest omt-test-expand-shorthand-mdy-bare-past ()
+  "Bare M/D uses next year when the date has already passed."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (cl-letf (((symbol-function 'decode-time)
+               (lambda (&rest _) '(0 0 0 1 10 2026 0 nil 0))))
+      (should (equal (omt--expand-shorthand-date "3/1") "2027-03-01")))))
+
+(ert-deftest omt-test-expand-shorthand-mdy-bare-today ()
+  "Bare M/D matching today still uses current year (>= today)."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (cl-letf (((symbol-function 'decode-time)
+               (lambda (&rest _) '(0 0 0 17 5 2026 0 nil 0))))
+      (should (equal (omt--expand-shorthand-date "5/17") "2026-05-17")))))
+
+(ert-deftest omt-test-expand-shorthand-out-of-range-day ()
+  "Out-of-range day returns nil."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (should (null (omt--expand-shorthand-date "2/30/2025")))))
+
+(ert-deftest omt-test-expand-shorthand-out-of-range-month ()
+  "Out-of-range month returns nil."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (should (null (omt--expand-shorthand-date "13/1/2025")))))
+
+(ert-deftest omt-test-expand-shorthand-dmy-full ()
+  "D/M/YYYY expands correctly with style dmy."
+  (let ((org-milestone-table-date-input-style 'dmy))
+    (should (equal (omt--expand-shorthand-date "17/5/2026") "2026-05-17"))))
+
+(ert-deftest omt-test-expand-shorthand-dmy-rejects-mdy ()
+  "With dmy, 5/17 means day=5 month=17 which is out of range."
+  (let ((org-milestone-table-date-input-style 'dmy))
+    (should (null (omt--expand-shorthand-date "5/17/2026")))))
+
+(ert-deftest omt-test-expand-shorthand-passthrough-iso ()
+  "Already-ISO dates pass through unchanged."
+  (should (equal (omt--expand-shorthand-date "2026-05-17") "2026-05-17")))
+
+(ert-deftest omt-test-expand-shorthand-passthrough-nonmatch ()
+  "Non-matching strings pass through unchanged."
+  (should (equal (omt--expand-shorthand-date "not a date") "not a date")))
+
 ;;; --- omt--format-date ---
 
 (ert-deftest omt-test-format-date ()
@@ -985,6 +1051,70 @@ but hide-done still creates a full-row invisibility overlay."
       (with-current-buffer buf
         (should (string-match-p "conflicts with predecessors"
                                 (buffer-string)))))))
+
+;;; --- Shorthand dates (integration) ---
+
+(ert-deftest omt-test-update-timeline-shorthand-rewrites-cell ()
+  "M/D/Y shorthand in a no-pred Date cell is rewritten to ISO."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (omt-test-with-table
+        "| ID | Pred | Date      | Milestone |
+|----+------+-----------+-----------|
+| 1  |      | 5/17/2026 | Start     |
+"
+      (org-milestone-table-update-timeline)
+      (goto-char (point-min))
+      (should (search-forward "2026-05-17" nil t))
+      (goto-char (point-min))
+      (should-not (search-forward "5/17/2026" nil t)))))
+
+(ert-deftest omt-test-update-timeline-shorthand-fixed-rewrites-cell ()
+  "F + shorthand is rewritten to `F YYYY-MM-DD' and stays fixed."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (omt-test-with-table
+        "| ID | Pred | Date        | Milestone |
+|----+------+-------------+-----------|
+| 1  |      | 2026-01-01  | Start     |
+| 2  | 1+5d | F 5/17/2026 | Pinned    |
+| 3  | 2+3d |             | After     |
+"
+      (org-milestone-table-update-timeline)
+      (goto-char (point-min))
+      (should (search-forward "F 2026-05-17" nil t))
+      ;; Downstream row uses fixed anchor (2026-05-17 + 3d).
+      (goto-char (point-min))
+      (should (search-forward "2026-05-20" nil t)))))
+
+(ert-deftest omt-test-update-timeline-shorthand-predecessor-source ()
+  "Shorthand on a predecessor row is rewritten; dependents resolve."
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (omt-test-with-table
+        "| ID | Pred | Date      | Milestone |
+|----+------+-----------+-----------|
+| 1  |      | 5/17/2026 | Start     |
+| 2  | 1+3d |           | After     |
+"
+      (org-milestone-table-update-timeline)
+      (goto-char (point-min))
+      (should (search-forward "2026-05-17" nil t))
+      (goto-char (point-min))
+      (should (search-forward "2026-05-20" nil t)))))
+
+(ert-deftest omt-test-update-timeline-shorthand-invalid-errors ()
+  "Invalid shorthand surfaces as `Bad date' in the errors buffer."
+  (when (get-buffer "*Milestone Table Errors*")
+    (kill-buffer "*Milestone Table Errors*"))
+  (let ((org-milestone-table-date-input-style 'mdy))
+    (omt-test-with-table
+        "| ID | Pred | Date      | Milestone |
+|----+------+-----------+-----------|
+| 1  |      | 2/30/2026 | Oops      |
+"
+      (org-milestone-table-update-timeline)
+      (let ((buf (get-buffer "*Milestone Table Errors*")))
+        (should buf)
+        (with-current-buffer buf
+          (should (string-match-p "Bad date" (buffer-string))))))))
 
 (provide 'org-milestone-table-test)
 ;;; org-milestone-table-test.el ends here

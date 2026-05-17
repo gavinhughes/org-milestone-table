@@ -78,6 +78,16 @@ The critical path can always be toggled manually with
 Customize the background and foreground colors to suit your theme."
   :group 'org-milestone-table)
 
+(defcustom org-milestone-table-date-input-style 'mdy
+  "Date input style for shorthand dates in the Date column.
+`mdy' (the default) parses N/N and N/N/N as month/day and
+month/day/year.  `dmy' parses them as day/month and day/month/year.
+Two-digit years are mapped to 2000+YY.  The canonical stored form
+is always ISO 8601 (YYYY-MM-DD)."
+  :type '(choice (const :tag "Month/Day/Year (US)" mdy)
+                 (const :tag "Day/Month/Year (EU)" dmy))
+  :group 'org-milestone-table)
+
 (defcustom org-milestone-table-done-statuses '("done" "Done" "DONE")
   "Status values that mark a milestone as done.
 Rows whose Status column matches any string in this list (compared
@@ -175,6 +185,40 @@ Each cell is trimmed of whitespace."
       (setq s (substring s 0 (1- (length s)))))
     (mapcar #'string-trim (split-string s "|"))))
 
+(defun omt--expand-shorthand-date (s)
+  "Return canonical YYYY-MM-DD if S is shorthand, else S unchanged.
+Returns nil if S looks like shorthand but is out of range.
+Style is controlled by `org-milestone-table-date-input-style'.
+Bare M/D (no year) infers the year forward-looking from today."
+  (if (or (not (stringp s))
+          (not (string-match
+                "\\`\\([0-9]+\\)/\\([0-9]+\\)\\(?:/\\([0-9]+\\)\\)?\\'"
+                s)))
+      s
+    (let* ((a (string-to-number (match-string 1 s)))
+           (b (string-to-number (match-string 2 s)))
+           (c-str (match-string 3 s))
+           (style org-milestone-table-date-input-style)
+           (mm (if (eq style 'dmy) b a))
+           (dd (if (eq style 'dmy) a b))
+           (yy (cond
+                ((null c-str)
+                 (let* ((today (decode-time))
+                        (cy (nth 5 today))
+                        (cm (nth 4 today))
+                        (cd (nth 3 today)))
+                   (if (or (< cm mm)
+                           (and (= cm mm) (<= cd dd)))
+                       cy
+                     (1+ cy))))
+                ((<= (length c-str) 2)
+                 (+ 2000 (string-to-number c-str)))
+                (t (string-to-number c-str)))))
+      (and (>= mm 1) (<= mm 12)
+           (>= dd 1)
+           (<= dd (calendar-last-day-of-month mm yy))
+           (format "%04d-%02d-%02d" yy mm dd)))))
+
 (defun omt--parse-date (s)
   "Parse YYYY-MM-DD into (month day year) or nil."
   (when (and (stringp s)
@@ -187,18 +231,28 @@ Each cell is trimmed of whitespace."
 
 (defun omt--parse-date-cell (s)
   "Parse Date cell S into a plist.
-Returns (:fixed BOOL :date STR-OR-NIL :raw S).
+Returns (:fixed BOOL :date STR-OR-NIL :raw S :canonicalized BOOL).
 :fixed is non-nil when S contains the marker `F' anywhere.
-:date is the trimmed remainder with `F' removed (or nil if empty).
+:date is the trimmed, shorthand-expanded date (canonical YYYY-MM-DD
+when shorthand was used) or nil if empty.
+:canonicalized is non-nil when shorthand expansion changed the value
+and the cell should be rewritten in place.
 Date validity is not checked here; pass :date to `omt--parse-date'."
   (let* ((raw (or s ""))
          (fixed (and (stringp raw) (string-match-p "F" raw)))
          (stripped (if fixed
                        (string-trim (replace-regexp-in-string "F" "" raw))
-                     (string-trim raw))))
+                     (string-trim raw)))
+         (expanded (and (not (string-empty-p stripped))
+                        (omt--expand-shorthand-date stripped))))
     (list :fixed (and fixed t)
-          :date (unless (string-empty-p stripped) stripped)
-          :raw raw)))
+          :date (cond
+                 ((string-empty-p stripped) nil)
+                 ((null expanded) stripped)
+                 (t expanded))
+          :raw raw
+          :canonicalized (and expanded
+                              (not (string= expanded stripped))))))
 
 (defun omt--format-date (greg)
   "Format gregorian (month day year) as YYYY-MM-DD."
@@ -572,6 +626,7 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
                             :pred (unless (string-empty-p pds) pds)
                             :date (plist-get dc :date)
                             :fixed (plist-get dc :fixed)
+                            :canonicalized (plist-get dc :canonicalized)
                             :status sts)))
               (push r rows)
               (when (plist-get r :id)
@@ -595,6 +650,14 @@ Uses the critical-ids stored by the last `org-milestone-table-update-timeline'."
                 (push (cons (plist-get r :line-beg)
                             (omt--format-date
                              (calendar-gregorian-from-absolute a)))
+                      updates))
+              (when (and (plist-get r :canonicalized)
+                         (or (plist-get r :fixed)
+                             (null (plist-get r :pred))))
+                (push (cons (plist-get r :line-beg)
+                            (if (plist-get r :fixed)
+                                (concat "F " (plist-get r :date))
+                              (plist-get r :date)))
                       updates)))))
         (if omt--errors
             (progn
