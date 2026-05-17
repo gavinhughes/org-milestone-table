@@ -143,6 +143,31 @@ For undated rows:
 - When two rows share the same date, the predecessor sorts above its
   dependent.
 
+* Date entry shorthand
+
+You can type dates in =M/D= or =M/D/Y= shorthand and they will be
+expanded to canonical =YYYY-MM-DD= on the next =C-c C-c=.
+
+| Typed       | Becomes      | Notes                                |
+|-------------+--------------+--------------------------------------|
+| =5/17/2026= | =2026-05-17= | Full 4-digit year                    |
+| =5/17/26=   | =2026-05-17= | Two-digit year maps to =2000+YY=     |
+| =5/17=      | =2026-05-17= | Year inferred forward-looking        |
+| =1/5/2026=  | =2026-01-05= | Zero-padded in canonical form        |
+
+Bare =M/D= uses the current year if that date is today or later;
+otherwise the next year — matching how Org's date prompt schedules
+forward.  Invalid shorthand (e.g. =2/30/2026=) is reported in
+=*Milestone Table Errors*= just like a malformed ISO date.
+
+Set =org-milestone-table-date-input-style= to ='dmy= to interpret
+shorthand as day/month (=17/5/2026= → =2026-05-17=); the default is
+='mdy=.  The canonical stored form is always ISO 8601 regardless of
+input style.
+
+The =F= fixed-date marker composes with shorthand: =F 5/17/2026= is
+rewritten to =F 2026-05-17= on =C-c C-c=.
+
 * Fixed dates
 
 Sometimes a milestone has an externally-imposed date — a venue is
@@ -216,7 +241,7 @@ frame) rather than the minibuffer.  Detected problems:
 - duplicate milestone IDs,
 - circular predecessor references,
 - predecessors that reference an unknown ID,
-- malformed dates (anything other than =YYYY-MM-DD=),
+- malformed dates (not =YYYY-MM-DD= and not valid =M/D=/=M/D/Y= shorthand),
 - malformed predecessor strings,
 - fixed dates (=F…=) earlier than their predecessor-derived date.
 
@@ -229,6 +254,7 @@ them.
 |---------------------------------------------------+--------------------------+-------------------------------------------------------------------------|
 | =org-milestone-table-highlight-critical-path=     | =nil=                    | When =t=, =C-c C-c= highlights the critical path automatically          |
 | =org-milestone-table-done-statuses=               | =("done" "Done" "DONE")= | Status values that trigger strikethrough and =toggle-hide-done=         |
+| =org-milestone-table-date-input-style=            | ='mdy=                   | Shorthand date order: ='mdy= for M/D/Y, ='dmy= for D/M/Y                |
 
 | Face                                              | Used for                                  |
 |---------------------------------------------------+-------------------------------------------|

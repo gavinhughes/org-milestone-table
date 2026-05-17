@@ -1,10 +1,9 @@
 #+title: Backlog
 #+strartup: overview
 
+* docs: Why no duration field?
+
 * Bug: C-c sorts table with no IDs or Dates added, should only add IDs
-* Feature: Dates can be entered in M/D or M/D/Y, configurable to D/M
-- Convert to standard form on C-c C-c
--
 * Feature: Duration
 * fix: C-c C-c: Leave point in place
 * Minimum required column names are
@@ -50,6 +49,17 @@ org-milestone-table-update-timeline
 * Maybe
 ** Feature: Support for business-day offsets (skip weekends)
 * [X] Done
+** DONE Feature: Dates can be entered in M/D or M/D/Y, configurable to D/M
+*** commit 82866ce
+=feat: accept M/D and M/D/Y date shorthand, rewritten to ISO on C-c C-c=
+
+Shorthand dates (~M/D~, ~M/D/Y~, ~M/D/YY~) in the Date column are expanded
+to canonical ~YYYY-MM-DD~ on ~C-c C-c~. Bare ~M/D~ infers the year
+forward-looking from today; two-digit years map to ~2000+YY~. New
+~org-milestone-table-date-input-style~ defcustom (default ~mdy~, set to
+~dmy~ for European order). The ~F~ fixed-date marker composes with
+shorthand.
+
 ** DONE Feature: Items with status Done are crossed out and can be hidden
 *** commit 712bf7d
 =feat: Status column with done strikethrough and hide-done toggle=

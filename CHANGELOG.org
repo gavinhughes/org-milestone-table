@@ -1,6 +1,7 @@
 #+title: Changelog
 
 * <2026-05-17 Sun>
+- Feature: Shorthand date entry in the ~Date~ column. Dates typed as ~M/D~ or ~M/D/Y~ (or ~M/D/YY~) are expanded to canonical ~YYYY-MM-DD~ on ~C-c C-c~. Bare ~M/D~ infers the year forward-looking from today (current year if the date is today or later, otherwise next year); two-digit years map to ~2000+YY~. New ~org-milestone-table-date-input-style~ (default ~mdy~, set to ~dmy~ for European day/month order). The ~F~ fixed-date marker composes with shorthand, e.g., ~F 5/17/2026~ becomes ~F 2026-05-17~.
 - Feature: ~F~ marker in the ~Date~ column pins a row to a fixed date. Including ~F~ anywhere in the cell (e.g., ~F2026-06-01~, ~F 2026-06-01~, ~2026-06-01 F~) prevents ~org-milestone-table-update-timeline~ from overwriting it; downstream rows still resolve from the fixed anchor. If the fixed date is earlier than the predecessor-derived date, the conflict is reported in the ~*Milestone Table Errors*~ buffer.
 - Change: Done-row strikethrough now covers only the ~Milestone~ column cell instead of the whole row. ~org-milestone-table-toggle-hide-done~ is unchanged — it still hides the full row via a separate invisibility overlay. Tables without a ~Milestone~ column get no strike but still support hide-done.
 
