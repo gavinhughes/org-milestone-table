@@ -1,5 +1,8 @@
 #+title: Changelog
 
+* <2026-05-17 Sun>
+- Change: Done-row strikethrough now covers only the ~Milestone~ column cell instead of the whole row. ~org-milestone-table-toggle-hide-done~ is unchanged — it still hides the full row via a separate invisibility overlay. Tables without a ~Milestone~ column get no strike but still support hide-done.
+
 * <2026-05-06 Wed>
 - Feature: Optional ~Status~ column.  Rows whose Status matches ~org-milestone-table-done-statuses~ (default ~("done" "Done" "DONE")~, compared case-insensitively) are rendered with a strikethrough via the new ~org-milestone-table-done~ face.
 - Feature: ~org-milestone-table-toggle-hide-done~ folds done rows out of view in the table.  The strikethrough indicates done state when not hidden.

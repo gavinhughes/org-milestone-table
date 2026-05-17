@@ -159,10 +159,12 @@ the latest finish.
 
 * Status column
 
-If your table has a =Status= column, =update-timeline= renders rows
-whose status matches a "done" value with a strikethrough.  =Done=
-rows still participate normally in date computation; the strikethrough
-is purely visual.
+If your table has a =Status= column, =update-timeline= renders the
+=Milestone= cell of rows whose status matches a "done" value with a
+strikethrough.  =Done= rows still participate normally in date
+computation; the strikethrough is purely visual.  Tables without a
+=Milestone= column get no strikethrough but still support
+=toggle-hide-done=.
 
 #+begin_example
 | ID | Pred  | Date       | Status | Milestone        |
@@ -207,7 +209,7 @@ them.
 | Face                                              | Used for                                  |
 |---------------------------------------------------+-------------------------------------------|
 | =org-milestone-table-critical-path=               | Critical-path row highlight overlay       |
-| =org-milestone-table-done=                        | Strikethrough on done-status rows         |
+| =org-milestone-table-done=                        | Strikethrough on the Milestone cell of done rows |
 
 * Suggested keybindings
 
