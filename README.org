@@ -143,6 +143,29 @@ For undated rows:
 - When two rows share the same date, the predecessor sorts above its
   dependent.
 
+* Fixed dates
+
+Sometimes a milestone has an externally-imposed date — a venue is
+booked, a permit deadline is set, a launch is announced.  Mark such a
+date as *fixed* by including =F= anywhere in the =Date= cell:
+
+#+begin_example
+| ID | Pred  | Date        | Milestone        |
+|----+-------+-------------+------------------|
+| 1  |       | 2026-01-01  | Project start    |
+| 2  | 1+14d | F2026-06-01 | Launch (booked)  |
+| 3  | 2+7d  |             | Post-launch wrap |
+#+end_example
+
+=F2026-06-01=, =F 2026-06-01=, and =2026-06-01 F= are all accepted.
+=update-timeline= leaves the cell text untouched, and downstream rows
+(here, row 3) resolve from the fixed date as their anchor.
+
+If a fixed date is *earlier* than the date its predecessors would
+produce, the conflict is reported in =*Milestone Table Errors*= and the
+table is left untouched until you resolve it.  A fixed date that is
+equal to or later than the predecessor-derived date is accepted.
+
 * Critical path
 
 After =org-milestone-table-update-timeline= computes dates, the package
@@ -194,7 +217,8 @@ frame) rather than the minibuffer.  Detected problems:
 - circular predecessor references,
 - predecessors that reference an unknown ID,
 - malformed dates (anything other than =YYYY-MM-DD=),
-- malformed predecessor strings.
+- malformed predecessor strings,
+- fixed dates (=F…=) earlier than their predecessor-derived date.
 
 When errors are present, the table is left untouched until you fix
 them.
